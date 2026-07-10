@@ -143,6 +143,23 @@ systemd-nspawn -D $1 --resolv-conf=replace-host --as-pid2 /bin/bash -c "
     echo 'zh_CN.UTF-8 UTF-8' >> /etc/locale.gen && locale-gen && update-locale LANG=zh_CN.UTF-8
 "
 
+# 编译安装 MPP 库（RK3588 硬件编码器用户态驱动）
+systemd-nspawn -D $1 \
+  --resolv-conf=replace-host \
+  --as-pid2 \
+  --setenv=DEBIAN_FRONTEND=noninteractive \
+  --setenv=DEBCONF_NONINTERACTIVE_SEEN=true \
+  /bin/bash -c "
+    sudo apt-get -y install cmake libdrm-dev libva-dev && \
+    git clone --depth 1 https://github.com/tsukumijima/mpp-rockchip.git /tmp/mpp-rockchip && \
+    mkdir /tmp/mpp-rockchip/build && cd /tmp/mpp-rockchip/build && \
+    cmake .. -DCMAKE_INSTALL_PREFIX=/usr && \
+    make -j\$(nproc) && \
+    sudo make install && \
+    sudo ldconfig && \
+    rm -rf /tmp/mpp-rockchip
+  "
+
 if [ "$build_type" = "desktop" ]; then
 systemd-nspawn -D $1 \
   --resolv-conf=replace-host \
