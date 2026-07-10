@@ -88,6 +88,17 @@ CONFIG_NTFS3_LZX_XPRESS=y
 CONFIG_NTFS3_FS_POSIX_ACL=y
 CONFIG_NTFS_FS=m
 
+# Btrfs（快照、子卷）
+CONFIG_BTRFS_FS=m
+
+# 网络文件系统（NFS / CIFS）
+CONFIG_NFS_FS=m
+CONFIG_NFSD=m
+CONFIG_CIFS=m
+
+# OverlayFS（Docker 容器）
+CONFIG_OVERLAY_FS=m
+
 # 其他
 CONFIG_BINFMT_MISC=m
 CONFIG_PSTORE=y
@@ -108,6 +119,25 @@ CONFIG_WWAN=n
 
 # CAN 总线
 CONFIG_CAN=n
+
+
+# -------------------------------------------------------------
+# [5.5] Netfilter / 防火墙（nftables + iptables 兼容）
+# -------------------------------------------------------------
+CONFIG_NETFILTER=y
+CONFIG_NF_TABLES=y
+CONFIG_NF_CONNTRACK=y
+CONFIG_NF_NAT=y
+CONFIG_NETFILTER_XTABLES=y
+
+
+# -------------------------------------------------------------
+# [5.6] 容器网络 & VPN
+# -------------------------------------------------------------
+CONFIG_BRIDGE=m
+CONFIG_VETH=y
+CONFIG_TUN=y
+CONFIG_WIREGUARD=m
 
 
 # -------------------------------------------------------------
@@ -167,7 +197,6 @@ CONFIG_VIDEO_ROCKCHIP_VDEC=m
 # -------------------------------------------------------------
 # 追加 Chromium 硬件解码支持
 # -------------------------------------------------------------
-CONFIG_VIDEO_ROCKCHIP_VDEC=m    # 现有：VPU 解码器（H.264/H.265/VP9）
 CONFIG_ROCKCHIP_IOMMU=y         # VPU DMA 访问所必需
 CONFIG_DMABUF_HEAPS=y           # 缓冲区共享（GPU↔VPU间）所必需
 CONFIG_DMABUF_HEAPS_SYSTEM=y    # 同上
@@ -230,18 +259,9 @@ CONFIG_CHROME_PLATFORMS=n
 CONFIG_SURFACE_PLATFORMS=n
 CONFIG_FTRACE=n
 
-# 不需要 XEN 虚拟化
-CONFIG_XEN=n
-
-# 不需要休眠
-CONFIG_HIBERNATION=n
-
 # 不需要 DVB 网络
 CONFIG_DVB_NET=n
 CONFIG_MEDIA_TUNER=n
-
-# 不需要 CAN 总线
-CONFIG_CAN=n
 
 # 非 Rockchip SoC（排除以加速构建）
 CONFIG_SOC_RENESAS=n

@@ -9,7 +9,7 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 set -x
 kernel=`ls kernel/linux*.deb|wc -l`
-if [ $kernel -ne 5 ]; then
+if [ $kernel -lt 3 ]; then
 	echo "Build kernel first"
 	exit 1
 fi
@@ -29,7 +29,7 @@ suite=$3
 Uri=$2
 #Uri="http://ports.ubuntu.com/ubuntu-ports"
 build_type="${4:-desktop}"
-	debootstrap --arch=arm64 $suite arm64 $Uri
+	debootstrap --arch=arm64 $suite $1 $Uri
 
 export DEBIAN_FRONTEND=noninteractive
 export DEBCONF_NONINTERACTIVE_SEEN=true
@@ -136,7 +136,13 @@ systemd-nspawn -D $1 \
   --setenv=DEBIAN_FRONTEND=noninteractive \
   --setenv=DEBCONF_NONINTERACTIVE_SEEN=true \
   /bin/bash -c "echo 'kdump-tools kdump-tools/use_kdump boolean false' | debconf-set-selections && \
-  sudo apt-get -y install linux-firmware aptdaemon initramfs-tools vim cloud-guest-utils e2fsprogs sudo openssh-server curl wget git htop net-tools build-essential ca-certificates"
+  sudo apt-get -y install linux-firmware aptdaemon initramfs-tools vim cloud-guest-utils e2fsprogs sudo openssh-server curl wget git htop net-tools build-essential ca-certificates ufw locales lm-sensors"
+
+# 生成中文 locale
+systemd-nspawn -D $1 --resolv-conf=replace-host --as-pid2 /bin/bash -c "
+    echo 'zh_CN.UTF-8 UTF-8' >> /etc/locale.gen && locale-gen && update-locale LANG=zh_CN.UTF-8
+"
+
 if [ "$build_type" = "desktop" ]; then
 systemd-nspawn -D $1 \
   --resolv-conf=replace-host \

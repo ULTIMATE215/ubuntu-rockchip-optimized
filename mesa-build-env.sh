@@ -32,7 +32,7 @@ export  LANG=C
 
 #Setup DNS
 echo "127.0.0.1 localhost" > $1/etc/hosts
-echo "127.0.0.1 ubuntu-desktop" > $1/etc/hosts
+echo "127.0.0.1 ubuntu-desktop" >> $1/etc/hosts
 echo "nameserver 8.8.8.8" > $1/etc/resolv.conf
 echo "nameserver 8.8.4.4" >> $1/etc/resolv.conf
 

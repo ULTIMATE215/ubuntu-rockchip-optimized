@@ -61,12 +61,12 @@ systemd-nspawn -D arm64 --resolv-conf=replace-host --as-pid2 sudo apt-get clean
 systemd-nspawn -D arm64 --resolv-conf=replace-host --as-pid2 sudo apt-get update
 systemd-nspawn -D arm64 --resolv-conf=replace-host --as-pid2 sudo apt-get -y upgrade
 systemd-nspawn -D arm64 --resolv-conf=replace-host --as-pid2 sudo apt-get -y dist-upgrade
-systemd-nspawn -D arm64 --resolv-conf=replace-host --as-pid2 sudo apt-get -y install build-essential gcc-aarch64-linux-gnu bison \
+systemd-nspawn -D arm64 --resolv-conf=replace-host --as-pid2 sudo apt-get -y install build-essential bison \
 debootstrap libssl-dev kmod cpio xz-utils fakeroot flex rsync \
 device-tree-compiler zstd python3 \
 python-is-python3 fdisk bc debhelper python3-pyelftools python3-setuptools \
 python3-pkg-resources swig libfdt-dev libpython3-dev \
-git fakeroot build-essential ncurses-dev \
+git ncurses-dev \
 libelf-dev libgnutls28-dev gcc-13 g++-13 libdw-dev
 
 systemd-nspawn -D arm64 --resolv-conf=replace-host --as-pid2 sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 13
@@ -91,24 +91,21 @@ if [ $4 == "kernel" ]; then
 # kernel
 cp build-kernel.sh arm64
 cp overlay/my-add.txt arm64
+cp overlay/my-add.txt arm64/my-add.txt.orig
 cp overlay/rk3588-pwm-fan.dtsi arm64
 chmod +x arm64/build-kernel.sh
 
-# CONFIG_CPU_FREQ_DEFAULT_GOV_CONSERVATIVE
+# 双 governor 构建复用同一份源码树
 systemd-nspawn -D arm64 \
   --resolv-conf=replace-host \
   --as-pid2 \
   --setenv=DEBIAN_FRONTEND=noninteractive \
   --setenv=DEBCONF_NONINTERACTIVE_SEEN=true \
-/bin/bash -c "./build-kernel.sh kernel CONFIG_CPU_FREQ_DEFAULT_GOV_CONSERVATIVE"
-
-# CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND
-systemd-nspawn -D arm64 \
-  --resolv-conf=replace-host \
-  --as-pid2 \
-  --setenv=DEBIAN_FRONTEND=noninteractive \
-  --setenv=DEBCONF_NONINTERACTIVE_SEEN=true \
-/bin/bash -c "./build-kernel.sh kernel CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND"
+/bin/bash -c "
+    ./build-kernel.sh kernel CONFIG_CPU_FREQ_DEFAULT_GOV_CONSERVATIVE
+    cp /my-add.txt.orig /my-add.txt
+    ./build-kernel.sh kernel CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND
+  "
 
 mkdir -p kernel
 cp arm64/*.deb kernel

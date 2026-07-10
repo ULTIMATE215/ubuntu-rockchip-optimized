@@ -6,17 +6,19 @@ trap 'echo Error: in $0 on line $LINENO' ERR
 set -x
 
 linux_dir=$1
-rm -rf $linux_dir && mkdir $linux_dir
-cd $linux_dir
+mkdir -p $linux_dir && cd $linux_dir
 
-
-git clone --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git -b linux-7.1.y
+if [ ! -d linux ]; then
+    git clone --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git -b linux-7.1.y
+fi
 
 cd linux
 cp /my-add.txt .
-# 将 PWM 风扇节点写入设备树
-cp /rk3588-pwm-fan.dtsi arch/arm64/boot/dts/rockchip/
-echo '#include "rk3588-pwm-fan.dtsi"' >> arch/arm64/boot/dts/rockchip/rk3588-orangepi-5-plus.dts
+# 将 PWM 风扇节点写入设备树（仅在首次执行）
+if ! grep -q 'rk3588-pwm-fan.dtsi' arch/arm64/boot/dts/rockchip/rk3588-orangepi-5-plus.dts; then
+    cp /rk3588-pwm-fan.dtsi arch/arm64/boot/dts/rockchip/
+    echo '#include "rk3588-pwm-fan.dtsi"' >> arch/arm64/boot/dts/rockchip/rk3588-orangepi-5-plus.dts
+fi
 kernel_para=$2
 echo "kernel_para=${kernel_para}"
 sed -i "s/$kernel_para\=n/$kernel_para\=y/" my-add.txt
