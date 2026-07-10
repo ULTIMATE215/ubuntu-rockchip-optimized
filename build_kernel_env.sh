@@ -93,6 +93,7 @@ cp build-kernel.sh arm64
 cp overlay/my-add.txt arm64
 cp overlay/my-add.txt arm64/my-add.txt.orig
 cp overlay/rk3588-pwm-fan.dtsi arm64
+cp -r kernel-patches arm64
 chmod +x arm64/build-kernel.sh
 
 # 双 governor 构建复用同一份源码树

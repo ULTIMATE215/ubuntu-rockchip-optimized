@@ -10,6 +10,14 @@ mkdir -p $linux_dir && cd $linux_dir
 
 if [ ! -d linux ]; then
     git clone --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git -b linux-7.1.y
+    cd linux
+    # 应用 out-of-tree 内核补丁
+    if ls /kernel-patches/*.patch 2>/dev/null; then
+        git config user.email "builder@localhost"
+        git config user.name "Builder"
+        git am /kernel-patches/*.patch
+    fi
+    cd ..
 fi
 
 cd linux
