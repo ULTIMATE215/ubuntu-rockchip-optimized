@@ -2,6 +2,8 @@
   refs:
   - :default
   resources: X2LARGE
+  events:
+  - type: PUSH
   trigger_conditions:
   - trigger_condition: TRIGGERING_USER_IS
     trigger_user: dobsondioda@gmail.com
