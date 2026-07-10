@@ -1,0 +1,109 @@
+version: 2.1
+
+parameters:
+  mesa_source:
+    type: string
+    default: "upstream"
+    description: "Select Mesa source (upstream or ubuntu)"
+
+jobs:
+  build:
+    parameters:
+      build_type:
+        type: string
+    machine:
+      image: ubuntu-2404:current
+    resource_class: arm.medium
+    steps:
+      - checkout
+      - run:
+          name: Install build dependencies
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends \
+              qemu-user-static binfmt-support debootstrap fakeroot \
+              dpkg-dev build-essential bc bison flex ccache rsync
+            sudo systemctl restart systemd-binfmt || true
+      - run:
+          name: Build << parameters.build_type >> image
+          environment:
+            DEBIAN_FRONTEND: noninteractive
+            DEBCONF_NOWARNINGS: "yes"
+          command: |
+            set -euxo pipefail
+            sed -i 's/\r$//' *.sh
+            mkdir -p build/overlay build/kernel build/images
+            cp *.sh build
+            cp my-add.txt libdrm-amdgpu1.symbols.patch overlay/rk3588-pwm-fan.dtsi build/overlay
+            cd build
+            chmod +x *.sh
+            BUILD_TYPE=<< parameters.build_type >> ./main-control.sh << pipeline.parameters.mesa_source >>
+            cd ..
+            echo " ------------- overlay -------------------"
+            ls build/overlay/
+            echo " ------------- kernel --------------------"
+            ls build/kernel/
+            echo " ------------ images ----------------------"
+            ls build/images/
+            shopt -s nullglob
+            images=(build/images/Ubuntu-*.img.xz)
+            if [ ${#images[@]} -eq 0 ]; then
+              echo "ERROR: 未找到磁盘镜像！"
+              exit 1
+            fi
+            for f in "${images[@]}"; do
+              newname="${f%.img.xz}-<< parameters.build_type >>.img.xz"
+              mv "$f" "$newname"
+              echo "Renamed: $(basename "$f") -> $(basename "$newname")"
+            done
+      - run:
+          name: Show diagnostics on failure
+          when: on_fail
+          command: |
+            ls -la build/ || true
+            ls -la build/overlay/ || true
+            ls -la build/kernel/ || true
+            ls -la build/images/ || true
+      - run:
+          name: Fix file permissions
+          command: sudo chown -R circleci:circleci ./build/overlay/* ./build/kernel/* ./build/images/*
+      - persist_to_workspace:
+          root: build
+          paths:
+            - images/Ubuntu-<< parameters.build_type >>-*.img.xz
+            - overlay/*.bin
+            - overlay/kernel_version
+            - overlay/rel.txt
+      - store_artifacts:
+          path: build/images
+
+  release:
+    machine:
+      image: ubuntu-2404:current
+    resource_class: medium
+    steps:
+      - attach_workspace:
+          at: /tmp/build
+      - run:
+          name: Combine artifacts
+          command: |
+            mkdir -p release/images
+            cp /tmp/build/images-*/*.img.xz release/images/ 2>/dev/null || true
+            cp /tmp/build/u-boot/*.bin release/ 2>/dev/null || true
+            ls -la release/
+
+workflows:
+  build-and-release:
+    when:
+      equal: [ "api", << pipeline.trigger_source >> ]
+    jobs:
+      - build:
+          name: build-desktop
+          build_type: desktop
+      - build:
+          name: build-server
+          build_type: server
+      - release:
+          requires:
+            - build-desktop
+            - build-server
