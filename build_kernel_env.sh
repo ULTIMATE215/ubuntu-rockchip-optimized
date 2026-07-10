@@ -16,6 +16,9 @@ suite=$3
 Uri=$2
 #Uri="http://ports.ubuntu.com/ubuntu-ports"
 
+# Ensure debootstrap has a script for this suite (newer Ubuntu releases may not be bundled)
+[ -f /usr/share/debootstrap/scripts/$suite ] || ln -sf gutsy /usr/share/debootstrap/scripts/$suite
+
 debootstrap --arch=arm64 $suite arm64 $Uri
 
 export DEBIAN_FRONTEND=noninteractive
