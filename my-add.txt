@@ -189,6 +189,33 @@ CONFIG_WIREGUARD=m
 
 
 # -------------------------------------------------------------
+# [5.7] TCP 性能、网络高可用 & IPsec
+# -------------------------------------------------------------
+# ========== TCP 性能与拥塞控制 ==========
+CONFIG_TCP_CONG_ADVANCED=y
+CONFIG_TCP_BBR=m                  # BBR 拥塞控制，高带宽/长距离网络必备
+CONFIG_NET_SCH_FQ=m                # FQ 队列调度，配合 BBR 发挥最佳性能
+CONFIG_DEFAULT_TCP_CONG="cubic"    # 默认用 cubic（稳定兼容），系统内可切换 BBR
+CONFIG_SYN_COOKIES=y               # 防 SYN 洪水攻击，公网服务器必备
+
+# ========== 网络高可用与隔离 ==========
+CONFIG_BONDING=m                   # 网卡绑定/链路聚合，多网口冗余
+CONFIG_VLAN_8021Q=m                # 802.1Q VLAN 划分，网络分段隔离
+CONFIG_VXLAN=m                     # VXLAN 隧道，Docker/K8s 网络插件必备
+
+# ========== VPN/IPsec 支持 ==========
+CONFIG_XFRM_USER=m
+CONFIG_INET_ESP=m
+CONFIG_INET_XFRM_MODE_TRANSPORT=m
+CONFIG_INET_XFRM_MODE_TUNNEL=m
+
+# ========== 运维友好扩展 ==========
+CONFIG_BRIDGE_NETFILTER=y          # 桥接层防火墙，Docker 端口映射依赖
+CONFIG_NETFILTER_XT_MATCH_COMMENT=m# iptables/nftables 规则注释，排错更方便
+CONFIG_NF_TABLES_SET=y             # nftables 集合，高效黑白名单
+
+
+# -------------------------------------------------------------
 # [6] USB
 # -------------------------------------------------------------
 CONFIG_USB_CONN_GPIO=m
