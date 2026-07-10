@@ -122,13 +122,61 @@ CONFIG_CAN=n
 
 
 # -------------------------------------------------------------
-# [5.5] Netfilter / 防火墙（nftables + iptables 兼容）
+# [5.5] Netfilter / 防火墙（nftables + iptables 全兼容，修复UFW报错）
 # -------------------------------------------------------------
+# 核心框架
 CONFIG_NETFILTER=y
 CONFIG_NF_TABLES=y
 CONFIG_NF_CONNTRACK=y
 CONFIG_NF_NAT=y
 CONFIG_NETFILTER_XTABLES=y
+
+# ========== 关键：开启传统iptables兼容层（解决 TABLE_ADD failed: table filter 核心报错） ==========
+# 老式 iptables 表支持（filter/mangle/nat）
+CONFIG_IP_NF_FILTER=m          # IPv4 filter 表，UFW 核心依赖
+CONFIG_IP_NF_NAT=m             # IPv4 NAT 表
+CONFIG_IP_NF_MANGLE=m          # IPv4 mangle 表
+CONFIG_IP6_NF_FILTER=m         # IPv6 filter 表
+CONFIG_IP6_NF_NAT=m            # IPv6 NAT 表
+CONFIG_IP6_NF_MANGLE=m         # IPv6 mangle 表
+
+# Xtables 兼容层（iptables-legacy / iptables-nft 都依赖）
+CONFIG_NETFILTER_XTABLES_COMPAT=y
+CONFIG_NETFILTER_XTABLES_LEGACY=y
+
+# Netlink 日志通道（修复 LOG 扩展不生效）
+CONFIG_NETFILTER_NETLINK_LOG=y
+
+# ========== 连接跟踪增强（修复 conntrack 模块警告） ==========
+CONFIG_NF_CONNTRACK_PROCFS=y   # /proc/net/nf_conntrack 接口
+CONFIG_NF_CONNTRACK_MARK=y     # 连接标记支持
+CONFIG_NF_CONNTRACK_ZONES=y    # 连接分区（容器网络必备）
+
+# ========== UFW 必备匹配模块（修复各类 Extension xxx not supported 警告） ==========
+# 基础协议匹配
+CONFIG_NETFILTER_XT_MATCH_TCP=m        # TCP 协议匹配
+CONFIG_NETFILTER_XT_MATCH_UDP=m        # UDP 协议匹配
+CONFIG_NETFILTER_XT_MATCH_ICMP=m       # ICMP 协议匹配
+CONFIG_NETFILTER_XT_MATCH_ICMPV6=m     # ICMPv6 协议匹配
+
+# 状态/连接匹配
+CONFIG_NETFILTER_XT_MATCH_CONNTRACK=m  # 连接跟踪匹配（原有保留）
+CONFIG_NETFILTER_XT_MATCH_STATE=m      # 连接状态匹配（state related/established）
+
+# 功能匹配
+CONFIG_NETFILTER_XT_MATCH_LIMIT=m      # 速率限制（修复 limit 扩展缺失）
+CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=m   # 地址类型匹配（原有保留）
+CONFIG_NETFILTER_XT_MATCH_MULTIPORT=m  # 多端口匹配
+CONFIG_NETFILTER_XT_MATCH_MAC=m        # MAC 地址匹配
+CONFIG_NETFILTER_XT_MATCH_MARK=m       # 标记匹配（原有保留）
+
+# ========== UFW 必备目标模块（修复 REJECT/LOG 目标缺失） ==========
+CONFIG_NETFILTER_XT_TARGET_LOG=m       # 日志目标（原有保留）
+CONFIG_IP_NF_TARGET_REJECT=m           # IPv4 拒绝目标（UFW 默认拒绝策略核心）
+CONFIG_IP6_NF_TARGET_REJECT=m          # IPv6 拒绝目标
+CONFIG_NETFILTER_XT_TARGET_MASQUERADE=m # 地址伪装（NAT/共享上网）
+CONFIG_NETFILTER_XT_TARGET_REDIRECT=m  # 端口重定向
+CONFIG_NETFILTER_XT_TARGET_DNAT=m      # 目的地址转换（端口转发）
 
 
 # -------------------------------------------------------------
