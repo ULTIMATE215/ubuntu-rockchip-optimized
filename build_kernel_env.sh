@@ -87,7 +87,7 @@ systemd-nspawn -D arm64 \
 
 cp arm64/*.bin overlay
 
-if [ $4 == "kernel" ]; then
+if [ "$4" = "kernel" ]; then
 # kernel
 cp build-kernel.sh arm64
 cp overlay/my-add.txt arm64

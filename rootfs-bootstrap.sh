@@ -44,7 +44,7 @@ echo "nameserver 8.8.8.8" > $1/etc/resolv.conf
 echo "nameserver 8.8.4.4" >> $1/etc/resolv.conf
 
 #sources.list setup
-rm $1/etc/hostname
+rm -f $1/etc/hostname
 if [ "$build_type" = "desktop" ]; then
 	echo "ubuntu-desktop" > $1/etc/hostname
 else
@@ -171,7 +171,7 @@ sed -i 's/#ADD_EXTRA_GROUPS=.*/ADD_EXTRA_GROUPS=1/g' $1/etc/adduser.conf
 
 
 # kernel
-mkdir $1/kkk && rm -f overlay/libdrm-dev_*.deb overlay/libegl1-mesa-dev_*.deb overlay/libgbm-dev_*.deb && \
+mkdir -p $1/kkk && rm -f overlay/libdrm-dev_*.deb overlay/libegl1-mesa-dev_*.deb overlay/libgbm-dev_*.deb && \
 rm -f overlay/libgl1-mesa-dev_*.deb overlay/libgles2-mesa-dev_*.deb overlay/mesa-common-dev_*.deb && \
 rm -f overlay/mesa-opencl-icd_*.deb overlay/mesa-teflon-delegate_*.deb overlay/mesa-drm-shim_*.deb && \
 rm -f overlay/libdrm-tests_*.deb && cp overlay/*.deb $1/kkk && cp -r kernel $1/kkk
