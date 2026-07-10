@@ -2,8 +2,8 @@
 set -eE
 trap 'echo "Error in $0 on line $LINENO"' ERR
 
-#suite=plucky
-suite=resolute
+suite=plucky
+#suite=resolute
 #Uri="http://ftp.udx.icscoe.jp/Linux/ubuntu-ports/"
 Uri="http://ports.ubuntu.com/ubuntu-ports"
 
