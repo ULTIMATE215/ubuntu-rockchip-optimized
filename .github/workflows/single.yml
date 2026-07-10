@@ -1,4 +1,6 @@
 - pipeline: v1-clean-build
+  refs:
+  - :default
   resources: X2LARGE
   trigger_conditions:
   - trigger_condition: TRIGGERING_USER_IS
