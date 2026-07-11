@@ -152,6 +152,7 @@ systemd-nspawn -D $1 \
   /bin/bash -c "
     sudo apt-get -y install cmake libdrm-dev libva-dev && \
     git clone --depth 1 https://github.com/tsukumijima/mpp-rockchip.git /tmp/mpp-rockchip && \
+    rm -rf /tmp/mpp-rockchip/osal/test && \
     mkdir -p /tmp/mpp-rockchip/build && cd /tmp/mpp-rockchip/build && \
     cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF && \
     make -j\$(nproc) && \
