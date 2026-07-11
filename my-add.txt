@@ -157,6 +157,10 @@ CONFIG_NFT_LIMIT=m
 CONFIG_NFT_CT=m
 CONFIG_NFT_COMPAT=m
 
+# IPv6 匹配模块（修复 ufw before6.rules rt/hl 扩展缺失）
+CONFIG_IP6_NF_MATCH_HL=m
+CONFIG_IP6_NF_MATCH_RT=m
+
 # Netlink 日志通道（修复 LOG 扩展不生效）
 CONFIG_NETFILTER_NETLINK_LOG=y
 
