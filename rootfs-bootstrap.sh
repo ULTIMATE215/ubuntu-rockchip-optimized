@@ -153,7 +153,7 @@ systemd-nspawn -D $1 \
     sudo apt-get -y install cmake libdrm-dev libva-dev && \
     git clone --depth 1 https://github.com/tsukumijima/mpp-rockchip.git /tmp/mpp-rockchip && \
     mkdir -p /tmp/mpp-rockchip/build && cd /tmp/mpp-rockchip/build && \
-    cmake .. -DCMAKE_INSTALL_PREFIX=/usr && \
+    cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_C_FLAGS="-Wno-error=address-of-packed-member" && \
     make -j\$(nproc) && \
     sudo make install && \
     sudo ldconfig && \
