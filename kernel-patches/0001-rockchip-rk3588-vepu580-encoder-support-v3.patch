@@ -1,4 +1,3 @@
-Binary files aa/.DS_Store and bb/.DS_Store differ
 diff -ruN aa/arch/arm64/boot/dts/rockchip/rk3588-base.dtsi bb/arch/arm64/boot/dts/rockchip/rk3588-base.dtsi
 --- aa/arch/arm64/boot/dts/rockchip/rk3588-base.dtsi	2026-02-09 18:12:23
 +++ bb/arch/arm64/boot/dts/rockchip/rk3588-base.dtsi	2026-02-07 09:40:49

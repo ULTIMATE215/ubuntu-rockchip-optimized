@@ -13,9 +13,9 @@ if [ ! -d linux ]; then
     cd linux
     # 应用 out-of-tree 内核补丁
     if ls /kernel-patches/*.patch 2>/dev/null; then
-        git config user.email "builder@localhost"
-        git config user.name "Builder"
-        git am /kernel-patches/*.patch
+        for p in /kernel-patches/*.patch; do
+            patch -p1 < "$p"
+        done
     fi
     cd ..
 fi
