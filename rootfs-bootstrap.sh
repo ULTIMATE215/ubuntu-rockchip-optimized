@@ -140,7 +140,7 @@ systemd-nspawn -D $1 \
 
 # 生成中文 locale
 systemd-nspawn -D $1 --resolv-conf=replace-host --as-pid2 /bin/bash -c "
-    echo 'zh_CN.UTF-8 UTF-8' >> /etc/locale.gen && locale-gen && update-locale LANG=zh_CN.UTF-8
+    echo 'zh_CN.UTF-8 UTF-8' >> /etc/locale.gen && locale-gen
 "
 
 # 编译安装 MPP 库（RK3588 硬件编码器用户态驱动）
@@ -243,6 +243,47 @@ mkdir -p $1/etc/chromium.d/
 echo 'export CHROMIUM_FLAGS="$CHROMIUM_FLAGS --enable-features=AcceleratedVideoDecoder,V4l2VideoDecode --disable-features=UseChromeOSDirectVideoDecoder"' > $1/etc/chromium.d/opi5-v4l2
 fi
 
+# 替换为清华镜像源（最终镜像用）
+cat > $1/etc/apt/sources.list.d/ubuntu.sources << 'SOURCEEOF'
+Types: deb
+URIs: https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports
+Suites: resolute resolute-updates resolute-backports
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+# 默认注释了源码镜像以提高 apt update 速度，如有需要可自行取消注释
+Types: deb-src
+URIs: https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports
+Suites: resolute resolute-updates resolute-backports
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+# 以下安全更新软件源为镜像站配置
+Types: deb
+URIs: https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports
+Suites: resolute-security
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+Types: deb-src
+URIs: https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports
+Suites: resolute-security
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+# 预发布软件源，不建议启用
+Types: deb
+URIs: https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports
+Suites: resolute-proposed
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+Types: deb-src
+URIs: https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports
+Suites: resolute-proposed
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+SOURCEEOF
 
 systemd-nspawn -D $1 --resolv-conf=replace-host --as-pid2 sudo apt-get -y autoremove
 systemd-nspawn -D $1 --resolv-conf=replace-host --as-pid2 sudo apt-get  clean
