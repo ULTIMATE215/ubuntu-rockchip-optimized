@@ -1,28 +1,13 @@
-name: v1-clean-build
+name: kernel-only-build
 on:
   workflow_dispatch:
-   inputs:
-      mesa_source:
-        description: 'Select Mesa source'
-        required: true
-        default: 'upstream'
-        type: choice
-        options:
-          - upstream
-          - ubuntu
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
-permissions:
-  contents: write
-
 jobs:
   build:
-    name: Build ${{ matrix.build_type }}
-    strategy:
-      matrix:
-        build_type: [desktop, server]
+    name: Build Kernel
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout
@@ -36,129 +21,32 @@ jobs:
             dpkg-dev build-essential bc bison flex ccache rsync
           sudo systemctl restart systemd-binfmt || true
 
-      - name: Build ${{ matrix.build_type }} image
-        env: 
-           mesa_source: ${{ github.event.inputs.mesa_source }}
-           build_type: ${{ matrix.build_type }}
-           DEBIAN_FRONTEND: noninteractive
-           DEBCONF_NOWARNINGS: yes
-           FAKEROOTD_SILENT: 1
+      - name: Build kernel
         run: |
           set -euxo pipefail
-          # Fix CRLF line endings from Windows (otherwise #!/bin/bash\r won't be found)
           sed -i 's/\r$//' *.sh
-          mkdir -p build/overlay build/kernel build/images
+          mkdir -p build/overlay build/kernel
           cp *.sh build
-          cp my-add.txt libdrm-amdgpu1.symbols.patch overlay/rk3588-pwm-fan.dtsi build/overlay
+          cp my-add.txt overlay/rk3588-pwm-fan.dtsi build/overlay
           cp -r kernel-patches build
           cd build
           chmod +x *.sh
-          BUILD_TYPE=$build_type ./main-control.sh $mesa_source
+          sudo ./build_kernel_env.sh orangepi-5-plus-rk3588_defconfig \
+            http://ports.ubuntu.com/ubuntu-ports resolute kernel
           cd ..
-          echo " ------------- overlay -------------------"
-          ls build/overlay/
-          echo " ------------- kernel --------------------"
-          ls build/kernel/
-          echo " ------------ images ----------------------"
-          ls build/images/
-          # 在镜像文件名中标记 build type
-          shopt -s nullglob
-          images=(build/images/Ubuntu-*.img.xz)
-          if [ ${#images[@]} -eq 0 ]; then
-            echo "ERROR: 未找到磁盘镜像！构建可能失败。"
-            exit 1
-          fi
-          for f in "${images[@]}"; do
-            newname="${f%.img.xz}-$build_type.img.xz"
-            mv "$f" "$newname"
-            echo "Renamed: $(basename "$f") -> $(basename "$newname")"
-          done
 
       - name: Show build diagnostics on failure
         if: failure()
         run: |
-          echo "=== build/ ==="
-          ls -la build/ || true
-          echo "=== overlay/ ==="
-          ls -la build/overlay/ || true
-          echo "=== kernel/ ==="
-          ls -la build/kernel/ || true
-          echo "=== images/ ==="
-          ls -la build/images/ || true
-
-      - name: Get kernel version
-        id: kernel
-        run: cat ./build/overlay/kernel_version >> $GITHUB_OUTPUT
-
-      - name: Mesa version
-        id: mesa
-        run: echo "release_mesa_info=$(cat ./build/overlay/rel.txt)" >> $GITHUB_OUTPUT
+          echo "=== build/ ===" && ls -la build/ || true
+          echo "=== overlay/ ===" && ls -la build/overlay/ || true
+          echo "=== kernel/ ===" && ls -la build/kernel/ || true
 
       - name: Fix file permissions
-        run: sudo chown -R runner:runner ./build/overlay/* ./build/kernel/* ./build/images/*
+        run: sudo chown -R runner:runner ./build/kernel/*
 
-      - name: Upload images artifact
+      - name: Upload kernel debs
         uses: actions/upload-artifact@v4
         with:
-          name: images-${{ matrix.build_type }}
-          path: ./build/images/Ubuntu-*.img.xz
-
-      - name: Upload u-boot (desktop only)
-        if: matrix.build_type == 'desktop'
-        uses: actions/upload-artifact@v4
-        with:
-          name: u-boot
-          path: ./build/overlay/*.bin
-
-      - name: Upload version info (desktop only)
-        if: matrix.build_type == 'desktop'
-        uses: actions/upload-artifact@v4
-        with:
-          name: version-info
-          path: |
-            ./build/overlay/kernel_version
-            ./build/overlay/rel.txt
-
-  release:
-    needs: build
-    name: Create Release
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-
-      - name: Get current date
-        id: date
-        run: echo "now=$(date +'%Y-%m-%d %H:%M')" >> $GITHUB_OUTPUT
-
-      - name: Get kernel version from artifact
-        id: kernel
-        run: cat ./version-info/kernel_version >> $GITHUB_OUTPUT
-
-      - name: Mesa version from artifact
-        id: mesa
-        run: echo "release_mesa_info=$(cat ./version-info/rel.txt)" >> $GITHUB_OUTPUT
-
-      - name: Create Release and Upload
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: build-${{ github.run_number }}
-          name: "Orange Pi 5 / 5 PLUS eMMC Disk Image Build ${{ github.run_number }}"
-          body: |
-            Orange Pi 5 / 5 PLUS eMMC disk image with Mesa for Rockchip
-
-            **Desktop** — GNOME 桌面环境，含 Firefox/Thunderbird/Chromium PPA 支持
-            **Server** — 纯命令行，最小化安装
-
-            U-Boot BOOT_TARGETS: mmc1 mmc0 nvme scsi (SD card & eMMC)
-            Build date: ${{ steps.date.outputs.now }}
-            Kernel: ${{ steps.kernel.outputs.kernel_version }}
-            Mesa: ${{ steps.mesa.outputs.release_mesa_info }}
-          draft: false
-          prerelease: false
-          files: |
-            ./images-desktop/*.img.xz
-            ./images-server/*.img.xz
-            ./u-boot/*.bin
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: kernel-debs
+          path: ./build/kernel/*.deb
