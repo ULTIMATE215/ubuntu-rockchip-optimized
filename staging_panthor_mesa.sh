@@ -18,6 +18,8 @@ apt-get source libdrm
 # 使用最新libdrm源码时
 cp -r libdrm-*/debian ./
 rm -rf libdrm-*/
+# 新版 libdrm 已移除 freedreno 选项，清理旧 debian/rules 中的残留
+sed -i 's/-Dfreedreno=enabled//g' debian/rules
 
 cd debian
 patch -p1 < /libdrm-amdgpu1.symbols.patch
