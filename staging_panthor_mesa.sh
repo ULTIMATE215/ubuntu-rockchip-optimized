@@ -20,6 +20,8 @@ cp -r libdrm-*/debian ./
 rm -rf libdrm-*/
 # 新版 libdrm 已移除 freedreno / freedreno-kgsl 选项，清理旧 debian/rules 中的残留
 sed -i 's/-Dfreedreno=enabled//g; s/-Dfreedreno-kgsl=true//g' debian/rules
+# freedreno 库不再生成，清空对应的安装列表防止 dh_install 报错
+truncate -s 0 debian/libdrm-freedreno1.install 2>/dev/null || true
 
 cd debian
 patch -p1 < /libdrm-amdgpu1.symbols.patch
