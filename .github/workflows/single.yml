@@ -63,7 +63,6 @@ jobs:
       - name: Build kernel
         run: |
           set -euxo pipefail
-          sed -i 's/\r$//' *.sh
           mkdir -p build/overlay build/kernel
           cp *.sh build
           cp my-add.txt overlay/rk3588-pwm-fan.dtsi build/overlay

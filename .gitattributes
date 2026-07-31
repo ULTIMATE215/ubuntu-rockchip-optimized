@@ -1,0 +1,25 @@
+# 仓库统一使用 LF 行尾。
+#
+# 背景：此前 .sh 文件混用 CRLF / LF，CI 不得不在每次构建开头执行
+# `sed -i 's/\r$//' *.sh` 兜底，否则 bash 会在 `do\r`、`}\r` 这类
+# 词法单元上报语法错误。锁定行尾后该兜底已从 workflow 中移除。
+* text=auto eol=lf
+
+# 明确指定：这些文件在容器/构建环境里会被直接执行或解析，必须是 LF
+*.sh        text eol=lf
+*.txt       text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.md        text eol=lf
+*.dtsi      text eol=lf
+*.dts       text eol=lf
+*.patch     text eol=lf
+*.symbols   text eol=lf
+
+# 二进制产物，不做任何行尾转换
+*.deb       binary
+*.bin       binary
+*.img       binary
+*.xz        binary
+*.zst       binary
+*.gz        binary

@@ -1,1 +1,38 @@
+# ── 构建产物 ────────────────────────────────────────────────
+# debootstrap 生成的 chroot（build_kernel_env.sh / mesa-build-env.sh /
+# rootfs-bootstrap.sh 都会 rm -rf 后重建，体积可达数 GB）
+/arm64/
+# CI 里的临时构建目录（.github/workflows/single.yml）
+/build/
+# 内核 deb 收集目录（build_kernel_env.sh 末尾 cp arm64/*.deb kernel）
+/kernel/
+# 内核源码树（build-kernel.sh 在此 git clone linux）
+/linux/
 boot/
+
+# ── 各阶段产出的包与镜像 ────────────────────────────────────
+*.deb
+*.ddeb
+*.buildinfo
+*.changes
+*.img
+*.img.xz
+
+# ── overlay/ 只跟踪源文件，其余都是构建期塞进去的 ───────────
+# 跟踪: rk3588-pwm-fan.dtsi
+# 忽略: u-boot 二进制、内核 deb、构建期从仓库根拷入的 my-add.txt、
+#       以及 build-kernel.sh 导出的最终 .config
+/overlay/*.bin
+/overlay/*.deb
+/overlay/my-add.txt
+/overlay/2-config.txt
+/overlay/rel.txt
+
+# ── main-control.sh 的日志 ──────────────────────────────────
+log?
+log??
+
+# ── 编辑器 / 系统杂项 ───────────────────────────────────────
+.DS_Store
+*.swp
+*~
