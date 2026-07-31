@@ -187,17 +187,3 @@ sudo apt install firefox-esr thunderbird-gnome-support chromium
 - 作为夏季防过热措施，推荐使用 `conservative` 内核。对CPU更友好，4K视频播放的体感差异也几乎不存在。
 - glmark2 得分会因测量时的系统负载（后台构建作业等）而大幅变动。空闲状态下的测量值才是公平的比较。
 
-## 🛠️ 关于开发者 (Authors)
-
-本项目诞生于人类工程师的构想力与AI技术支持融合的「AI共同开发（AI Co-Development）」。
-
-- **Main Lead & Build Architect**: hakotani
-  - **GitHub**: [@hakotani-o](https://github.com/hakotani-o)
-  - *负责概念设计、高级内核定制、Mesa隔离构建、洁净构建环境的搭建，以及GitHub自动化流水线的构建。*
-
-- **AI Co-Pilot & Technical Advisor**: Google AI / Anthropic Claude
-  - *Google AI: 协助内核选项优化提案、Mesa构建标志验证、最新Linux 7.0/Mesa 25.3环境下V4L2/GStreamer相关问题的排查。*
-  - *Anthropic Claude: 协助内核配置的审查·优化（Rockchip/RK3588专用）、DMABUF_HEAPS·AHCI/SATA支持的添加、洁净构建环境（systemd-nspawn）的设计、CPU Governor实测比较·选型、kdump-tools排除（APT Pin方式）、性能数据分析。*
-
----
-*本项目使用 GitHub Actions，完全自动完成从源码编译内核、Mesa隔离编译（创建deb包），到发布上传的全部流程。*
