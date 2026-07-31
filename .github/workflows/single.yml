@@ -1,6 +1,27 @@
 name: kernel-only-build
+run-name: >-
+  内核构建
+  ${{ inputs.gov_ondemand     && '· ondemand'     || '' }}${{ inputs.gov_conservative && '· conservative' || '' }}${{ inputs.gov_performance  && '· performance'  || '' }}${{ inputs.gov_schedutil    && '· schedutil'    || '' }}
+
 on:
   workflow_dispatch:
+    inputs:
+      gov_ondemand:
+        description: 'ondemand — 性能与功耗平衡（实测突发负载 25.0ms）'
+        type: boolean
+        default: true
+      gov_conservative:
+        description: 'conservative — 省电 / 防过热，夏季推荐'
+        type: boolean
+        default: true
+      gov_performance:
+        description: 'performance — 最高性能，突发负载比 ondemand 快 25%（实测 20.0ms）'
+        type: boolean
+        default: false
+      gov_schedutil:
+        description: 'schedutil — 不推荐，实测突发负载慢 89%（37.9ms，全程摸不到满频）'
+        type: boolean
+        default: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -12,6 +33,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: 解析要构建的内核模式
+        id: govs
+        run: |
+          set -euo pipefail
+          list=""
+          if [ "${{ inputs.gov_conservative }}" = "true" ]; then list="$list,conservative"; fi
+          if [ "${{ inputs.gov_ondemand }}"     = "true" ]; then list="$list,ondemand";     fi
+          if [ "${{ inputs.gov_performance }}"  = "true" ]; then list="$list,performance";  fi
+          if [ "${{ inputs.gov_schedutil }}"    = "true" ]; then list="$list,schedutil";    fi
+          list="${list#,}"
+          if [ -z "$list" ]; then
+            echo "::error::至少要勾选一种内核模式"
+            exit 1
+          fi
+          echo "list=$list" >> "$GITHUB_OUTPUT"
+          echo "slug=$(echo "$list" | tr ',' '-')" >> "$GITHUB_OUTPUT"
+          echo "### 将构建的内核模式: \`$list\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Install build dependencies
         run: |
@@ -32,7 +71,8 @@ jobs:
           cd build
           chmod +x *.sh
           sudo ./build_kernel_env.sh orangepi-5-plus-rk3588_defconfig \
-            http://ports.ubuntu.com/ubuntu-ports resolute kernel
+            http://ports.ubuntu.com/ubuntu-ports resolute kernel \
+            "${{ steps.govs.outputs.list }}"
           cd ..
 
       - name: Show build diagnostics on failure
@@ -45,8 +85,15 @@ jobs:
       - name: Fix file permissions
         run: sudo chown -R runner:runner ./build/kernel/*
 
+      - name: 列出产物
+        run: |
+          echo "### 构建产物" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          ls -lh ./build/kernel/*.deb | awk '{print $9, $5}' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload kernel debs
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-debs
+          name: kernel-debs-${{ steps.govs.outputs.slug }}
           path: ./build/kernel/*.deb

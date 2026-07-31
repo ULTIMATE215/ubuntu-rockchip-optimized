@@ -16,6 +16,10 @@ suite=$3
 Uri=$2
 #Uri="http://ports.ubuntu.com/ubuntu-ports"
 
+# 要构建的内核模式（CPUFreq governor），逗号分隔。
+# 未传入时保持原有行为：conservative + ondemand。
+kernel_govs=${5:-conservative,ondemand}
+
 debootstrap --arch=arm64 $suite arm64 $Uri
 
 export DEBIAN_FRONTEND=noninteractive
@@ -96,17 +100,39 @@ cp overlay/rk3588-pwm-fan.dtsi arm64
 cp -r kernel-patches arm64
 chmod +x arm64/build-kernel.sh
 
-# 双 governor 构建复用同一份源码树
+# 按 $5 指定的模式依次构建，多个模式复用同一份源码树（增量编译）。
+# build-kernel.sh 会把 my-add.txt 里对应 governor 的 =n 改成 =y，
+# 并以该名字作为 LOCALVERSION，因此每个模式产出的 deb 文件名互不冲突。
+build_cmds=""
+IFS=',' read -ra _govs <<< "$kernel_govs"
+for _g in "${_govs[@]}"; do
+    _g=$(echo "$_g" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+    [ -z "$_g" ] && continue
+    case "$_g" in
+        ondemand|conservative|performance|schedutil) ;;
+        *) echo "错误: 未知的内核模式 '$_g' (可选: ondemand conservative performance schedutil)"; exit 1 ;;
+    esac
+    _sym="CONFIG_CPU_FREQ_DEFAULT_GOV_$(echo "$_g" | tr '[:lower:]' '[:upper:]')"
+    # 每轮都从 .orig 还原，避免上一轮的 sed 结果串到下一轮
+    build_cmds="${build_cmds}cp /my-add.txt.orig /my-add.txt
+./build-kernel.sh kernel ${_sym}
+"
+done
+
+if [ -z "$build_cmds" ]; then
+    echo "错误: 未指定任何内核模式"
+    exit 1
+fi
+
+echo "##### 将构建以下内核模式: ${kernel_govs} #####"
+
 systemd-nspawn -D arm64 \
   --resolv-conf=replace-host \
   --as-pid2 \
   --setenv=DEBIAN_FRONTEND=noninteractive \
   --setenv=DEBCONF_NONINTERACTIVE_SEEN=true \
-/bin/bash -c "
-    ./build-kernel.sh kernel CONFIG_CPU_FREQ_DEFAULT_GOV_CONSERVATIVE
-    cp /my-add.txt.orig /my-add.txt
-    ./build-kernel.sh kernel CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND
-  "
+/bin/bash -c "set -e
+${build_cmds}"
 
 mkdir -p kernel
 cp arm64/*.deb kernel
