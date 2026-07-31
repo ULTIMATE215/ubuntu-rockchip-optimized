@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -eE
-trap 'echo Error: in $0 on line $LINENO' ERR
+trap 'echo "Error in $0 on line $LINENO"' ERR
 
 if [ "$(id -u)" -ne 0 ]; then 
     echo "Please run as root"
@@ -60,7 +60,7 @@ rm -f $1/etc/apt/sources.list
 mkdir -p $1/etc/apt/apt.conf.d
 echo 'Acquire::Retries "5";' > $1/etc/apt/apt.conf.d/99-retries
 
-echo "\n##################	systemd-nspawn	START	#######################\n"
+printf "\n%s\n\n" "##################	systemd-nspawn	START	#######################"
 
 systemd-nspawn -D $1 --resolv-conf=replace-host -E DEBIAN_FRONTEND=noninteractive --as-pid2 sudo apt-get clean
 systemd-nspawn -D $1 --resolv-conf=replace-host -E DEBIAN_FRONTEND=noninteractive --as-pid2 sudo apt-get update
@@ -86,7 +86,7 @@ libclc-21-dev llvm-21-dev libllvmspirvlib-21-dev libclang-cpp21-dev \
 libclang-21-dev lua5.4 liblua5.4-dev valgrind libarchive-dev libconfig-dev
 #libunwind-dev
 
-echo "\n##################	systemd-nspawn	END	#######################\n"
+printf "\n%s\n\n" "##################	systemd-nspawn	END	#######################"
 
 # Mesa new part1
 #echo "--------------- build-dep -y mesa start ---------------------"

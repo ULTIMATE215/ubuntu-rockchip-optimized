@@ -1,6 +1,6 @@
 #!/bin/bash
-set -eE 
-trap 'echo Error: in $0 on line $LINENO' ERR
+set -eE
+trap 'echo "Error in $0 on line $LINENO"' ERR
 
 set -x
 

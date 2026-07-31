@@ -1,5 +1,6 @@
 #!/bin/bash
-set -e # 发生错误时立即停止
+set -eE
+trap 'echo "Error in $0 on line $LINENO"' ERR
 set -x
  echo "deb-src http://ports.ubuntu.com/ubuntu-ports resolute main restricted universe multiverse" | sudo tee /etc/apt/sources.list.d/ubuntu26-src.list
  echo "deb-src http://ports.ubuntu.com/ubuntu-ports resolute-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list.d/ubuntu26-src.list

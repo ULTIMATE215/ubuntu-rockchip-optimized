@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -eE
-trap 'echo Error: in $0 on line $LINENO' ERR
+trap 'echo "Error in $0 on line $LINENO"' ERR
 
 set -x
 
@@ -51,9 +51,5 @@ make -j$(nproc) LOCALVERSION="-${kernel_name,,}"
 MAKEFLAGS=-j1 DEB_RULES_REQUIRES_ROOT=no make LOCALVERSION="-${kernel_name,,}" bindeb-pkg
 cd ..
 cp *.deb /
-
-
-# Exit trap is no longer needed
-trap '' EXIT
 
 exit 0

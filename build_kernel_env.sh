@@ -59,7 +59,7 @@ rm -f arm64/etc/apt/sources.list
 mkdir -p arm64/etc/apt/apt.conf.d
 echo 'Acquire::Retries "5";' > arm64/etc/apt/apt.conf.d/99-retries
 
-echo "\n##################      systemd-nspawn  START   #######################\n"
+printf "\n%s\n\n" "##################      systemd-nspawn  START   #######################"
 
 systemd-nspawn -D arm64 --resolv-conf=replace-host --as-pid2 sudo apt-get clean
 systemd-nspawn -D arm64 --resolv-conf=replace-host --as-pid2 sudo apt-get update
@@ -76,7 +76,7 @@ libelf-dev libgnutls28-dev gcc-13 g++-13 libdw-dev
 systemd-nspawn -D arm64 --resolv-conf=replace-host --as-pid2 sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 13
 systemd-nspawn -D arm64 --resolv-conf=replace-host --as-pid2 sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 13
 
-echo "\n##################      systemd-nspawn  END     #######################\n"
+printf "\n%s\n\n" "##################      systemd-nspawn  END     #######################"
 
 # u-boot
 cp das-u-boot.sh arm64

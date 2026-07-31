@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -eE
-trap 'echo Error: in $0 on line $LINENO' ERR
+trap 'echo "Error in $0 on line $LINENO"' ERR
 
 if [ "$(id -u)" -ne 0 ]; then 
     echo "Please run as root"
@@ -301,9 +301,7 @@ echo " Now create $rootfs "
 tar -zcf ../$rootfs --xattrs --xattrs-include='*' ./*
 cd ..
 echo "DISK usage"
-df $1  
-# Exit trap is no longer needed
-trap '' EXIT
+df $1
 if [ $mem_size -gt 10 ]; then
 	umount $1
 	sleep 2
