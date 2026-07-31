@@ -1,8 +1,21 @@
 # =============================================================
-# my-add.txt  --  OrangePi 5 / 5 Plus (RK3588S / RK3588)
-# Target : linux-7.x  (arm64, 基于 defconfig 合并)
-# 用途   : 桌面/GUI，内核子系统已全部恢复
+# my-add.txt  --  Orange Pi 5 Plus (RK3588) 高性能内核配置
+# Target : linux-7.1.y (arm64, 基于 `make defconfig` 合并)
 # Usage  : ./scripts/kconfig/merge_config.sh -m .config my-add.txt
+#
+# 实测目标硬件（本文件按此硬件裁剪/调优）:
+#   SoC      : RK3588  4x Cortex-A76 @2.4GHz + 4x Cortex-A55 @1.8GHz (ARMv8.2)
+#   RAM      : 16 GB
+#   GPU      : Mali-G610 (Panthor)
+#   VPU      : RKVDEC2 解码 + VEPU580 编码 (out-of-tree patch)
+#   存储     : eMMC 233GB (HS400/CQE) + M.2 (NVMe 或 JMB582 PCIe→SATA)
+#   网络     : 2x RTL8125 2.5GbE (PCIe) + RTL8852BE WiFi6 (PCIe) + Realtek BT (USB)
+#   USB      : GL3523 USB3 Hub
+#   音频     : ES8328 + HDMI
+#   散热     : PWM 风扇 (见 overlay/rk3588-pwm-fan.dtsi)
+#
+# 注意: merge_config 对同一符号「后出现的行覆盖先出现的行」。
+#       文件末尾的 [16] 本机硬件锁定 因此拥有最高优先级。
 # =============================================================
 
 
@@ -10,14 +23,18 @@
 # [1] 构建通用
 # -------------------------------------------------------------
 CONFIG_LOCALVERSION_AUTO=n
-CONFIG_VERSION_SIGNATURE=""
 CONFIG_EXPERT=y
+
+# 编译器优化：优先性能而非体积
+CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y
+CONFIG_CC_OPTIMIZE_FOR_SIZE=n
 
 # 日志缓冲区（桌面用途，设置较大）
 CONFIG_LOG_BUF_SHIFT=18
 CONFIG_LOG_CPU_MAX_BUF_SHIFT=17
 
 # 模块压缩（推荐zstd）
+# ※ CONFIG_MODULE_COMPRESS 是总开关，下面三项都 depends on 它，不能省。
 CONFIG_MODULE_COMPRESS=y
 CONFIG_MODULE_COMPRESS_ZSTD=y
 CONFIG_MODULE_COMPRESS_ALL=y
@@ -31,30 +48,69 @@ CONFIG_COMPRESSED_INSTALL=y
 
 
 # -------------------------------------------------------------
-# [2] 平台：仅 Rockchip 有效（非 Rockchip SoC 仍排除以加速构建）
+# [2] 平台：仅保留 Rockchip
 # -------------------------------------------------------------
 CONFIG_ARCH_ROCKCHIP=y
 
-
-# -------------------------------------------------------------
-# [3] CPU·调度器
-# -------------------------------------------------------------
-CONFIG_NR_CPUS=8
-CONFIG_HZ_300=y
-
-# -------------------------------------------------------------
-# [3.5] CPUFreq governor
-# -------------------------------------------------------------
-## 关于 CPU Governor
-# 默认使用 `conservative`（平衡优先）。
-# 可根据用途更改：
-# - **3D/游戏优先**: `ondemand`
-# - **视频播放/省电优先**: `schedutil`
-# - **平衡**: `conservative`（默认）
-CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=n
-CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=n
-CONFIG_CPU_FREQ_DEFAULT_GOV_CONSERVATIVE=n
-#CONFIG_CPU_FREQ_DEFAULT_GOV_CONSERVATIVE=y
+# --- 关闭全部非 Rockchip 的 arm64 平台 ---------------------------------
+# `make defconfig` 会打开 52 个 SoC 平台族（当前产出约 1379 个模块）。
+# 全部关闭可大幅缩短 CI 构建时间、减小 initramfs / DTB / 模块体积，
+# 并减少启动时无谓的平台 initcall。
+#
+# ※ 这里关的是「SoC 平台」，不是 PCI/USB 设备驱动。
+#   例如 CONFIG_ARCH_REALTEK 指的是 Realtek 电视盒 SoC (RTD1295)，
+#   与本机的 RTL8125 网卡 / RTL8852BE 无线网卡毫无关系，后者见 [16]。
+# ※ 若某次构建因此失败，把本小节整段注释掉即可回到原状态。
+CONFIG_ARCH_ACTIONS=n
+CONFIG_ARCH_AIROHA=n
+CONFIG_ARCH_ALPINE=n
+CONFIG_ARCH_APPLE=n
+CONFIG_ARCH_ARTPEC=n
+CONFIG_ARCH_AXIADO=n
+CONFIG_ARCH_BCM=n
+CONFIG_ARCH_BCM2835=n
+CONFIG_ARCH_BCM_IPROC=n
+CONFIG_ARCH_BCMBCA=n
+CONFIG_ARCH_BRCMSTB=n
+CONFIG_ARCH_BERLIN=n
+CONFIG_ARCH_BLAIZE=n
+CONFIG_ARCH_BST=n
+CONFIG_ARCH_CIX=n
+CONFIG_ARCH_EXYNOS=n
+CONFIG_ARCH_HISI=n
+CONFIG_ARCH_INTEL_SOCFPGA=n
+CONFIG_ARCH_K3=n
+CONFIG_ARCH_KEEMBAY=n
+CONFIG_ARCH_LAYERSCAPE=n
+CONFIG_ARCH_LG1K=n
+CONFIG_ARCH_MA35=n
+CONFIG_ARCH_MEDIATEK=n
+CONFIG_ARCH_MESON=n
+CONFIG_ARCH_MICROCHIP=n
+CONFIG_ARCH_MVEBU=n
+CONFIG_ARCH_MXC=n
+CONFIG_ARCH_NPCM=n
+CONFIG_ARCH_NXP=n
+CONFIG_ARCH_QCOM=n
+CONFIG_ARCH_REALTEK=n
+CONFIG_ARCH_RENESAS=n
+CONFIG_ARCH_S32=n
+CONFIG_ARCH_SEATTLE=n
+CONFIG_ARCH_SOPHGO=n
+CONFIG_ARCH_SPARX5=n
+CONFIG_ARCH_SPRD=n
+CONFIG_ARCH_STM32=n
+CONFIG_ARCH_SUNXI=n
+CONFIG_ARCH_SYNQUACER=n
+CONFIG_ARCH_TEGRA=n
+CONFIG_ARCH_TESLA_FSD=n
+CONFIG_ARCH_THUNDER=n
+CONFIG_ARCH_THUNDER2=n
+CONFIG_ARCH_UNIPHIER=n
+CONFIG_ARCH_VEXPRESS=n
+CONFIG_ARCH_VISCONTI=n
+CONFIG_ARCH_XGENE=n
+CONFIG_ARCH_ZYNQMP=n
 
 # 不需要 XEN
 CONFIG_XEN=n
@@ -62,8 +118,151 @@ CONFIG_XEN=n
 # 不需要休眠（桌面用途的省电只需 suspend-to-RAM 即可）
 CONFIG_HIBERNATION=n
 
+
+# -------------------------------------------------------------
+# [3] CPU · 调度器 · 抢占
+# -------------------------------------------------------------
+CONFIG_NR_CPUS=8
+
+# 时钟频率 1000Hz：桌面/GUI 的调度粒度与帧节奏更细腻。
+# 配合 NO_HZ_IDLE，空闲时不会产生额外中断，功耗代价可忽略。
+CONFIG_HZ_300=n
+CONFIG_HZ_1000=y
+CONFIG_HZ=1000
+
+# 完全抢占 + 运行时可切换。
+# 内核参数 preempt=full|lazy|voluntary|none 可在不重新编译的情况下调整，
+# 编译期开销约等于零（arm64 使用 static key 实现）。
+CONFIG_PREEMPT=y
+CONFIG_PREEMPT_DYNAMIC=y
+
+# big.LITTLE 调度域：RK3588 为 A76x2 + A76x2 + A55x4 三簇结构
+CONFIG_SCHED_MC=y
+CONFIG_SCHED_CLUSTER=y
+CONFIG_ENERGY_MODEL=y
+# RK3588 无 SMT，去掉 SMT 调度域可省掉一层无用的 domain 遍历
+CONFIG_SCHED_SMT=n
+
+# cpuidle：TEO 对交互式负载的空闲状态预测优于 menu。
+# 两者都编译，默认仍是 menu；如需切换加内核参数 cpuidle.governor=teo
+CONFIG_CPU_IDLE=y
+CONFIG_CPU_IDLE_GOV_MENU=y
+CONFIG_CPU_IDLE_GOV_TEO=y
+CONFIG_ARM_PSCI_CPUIDLE=y
+
 # ACPI parking protocol（用于多核启动，RK3588 有用）
 CONFIG_ARM64_ACPI_PARKING_PROTOCOL=y
+
+
+# -------------------------------------------------------------
+# [3.2] ARM64 针对 Cortex-A76 / A55 (ARMv8.2) 的裁剪
+# -------------------------------------------------------------
+# 以下扩展 RK3588 的 CPU 全部不具备，编译进来只会白白增大内核 text、
+# 增加上下文切换分支和 I-cache 压力，关掉没有任何安全或功能损失：
+#
+#   PTR_AUTH_KERNEL : 需 ARMv8.3 FEAT_PAuth。开启时 GCC 会给每个非叶函数
+#                     插入 paciasp/autiasp，在本 CPU 上只是两条 NOP。
+#   BTI_KERNEL      : 需 ARMv8.5 FEAT_BTI，同理只会插入 landing pad。
+#   MTE             : 需 ARMv8.5 内存标记，本 CPU 无。
+#   SVE / SME       : 本 CPU 无向量扩展，关掉可精简 FPSIMD 上下文切换路径。
+CONFIG_ARM64_PTR_AUTH_KERNEL=n
+CONFIG_ARM64_BTI_KERNEL=n
+CONFIG_ARM64_MTE=n
+CONFIG_ARM64_SVE=n
+CONFIG_ARM64_SME=n
+
+# 48-bit VA (256TB) 对 16GB 内存绰绰有余。
+# defconfig 的 52-bit VA 需要 ARMv8.7 LPA2，本 CPU 不支持，
+# 内核只能在运行时把第 5 级页表折叠掉——改成 48 位可直接省掉这层间接。
+CONFIG_ARM64_VA_BITS_52=n
+CONFIG_ARM64_VA_BITS_48=y
+
+# ※ Spectre-BHB / KPTI 缓解措施保持开启（A76 受影响）。
+#   若只是想做跑分对比，可用内核参数 mitigations=off，不必重新编译。
+
+
+# -------------------------------------------------------------
+# [3.5] CPUFreq governor
+# -------------------------------------------------------------
+## build-kernel.sh 会把下面其中一行的 =n 替换成 =y，并以该名字命名内核。
+## 参数由 build_kernel_env.sh 传入，目前构建 conservative + ondemand 两个版本。
+##
+## ===== 本机实测数据 (2026-07-31, A76 cpu6, 20ms 计算 + 60ms 空闲的突发负载) =====
+##   governor      突发耗时(中位)   平均频率    满频占比   持续满载吞吐
+##   performance      20.0 ms       2400 MHz     100%       ~2700 Mops/s
+##   ondemand         25.0 ms       1720 MHz      32%       ~2700 Mops/s
+##   schedutil        37.9 ms       1210 MHz       0%       ~2700 Mops/s
+##
+##   结论 1: 持续满载时三者完全等价（都锁满频），差别只体现在突发/交互负载。
+##   结论 2: schedutil 在本内核上明显最慢。原因是它按 PELT 平均利用率定频，
+##           25% 占空比的任务就只给 ~1.2GHz，全程摸不到满频；而唯一能纠正
+##           这一点的 uclamp 提频机制需要 CONFIG_UCLAMP_TASK（当前未开启，
+##           且 Ubuntu 桌面侧也没有组件会去设置 uclamp.min）。
+##           EAS 确实能激活（sched_energy_aware=1），但它只影响任务在哪个簇
+##           上跑，不影响调频激进程度，救不了这 89% 的差距。
+##   结论 3: 追求性能就用 `performance`，其次 `ondemand`。不要用 schedutil，
+##           除非先开 CONFIG_UCLAMP_TASK 并在用户态自行配置 uclamp。
+##           实测满载 8 线程温度也只到 48°C（PWM 风扇在工作），
+##           `performance` 对本机是可行选项。
+##
+## - **最高性能/低延迟** : `performance`（突发负载比 ondemand 再快 25%）
+## - **性能与功耗平衡**  : `ondemand`（当前默认）
+## - **省电/防过热**     : `conservative`
+## - **不推荐**          : `schedutil`（理由见上）
+##
+## 想改构建组合，编辑 build_kernel_env.sh 里那两行 ./build-kernel.sh 的参数即可。
+CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=n
+CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=n
+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=n
+CONFIG_CPU_FREQ_DEFAULT_GOV_CONSERVATIVE=n
+
+# 四种调速器全部编译进来，运行时可用 cpupower/sysfs 随时切换
+CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
+CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
+CONFIG_CPU_FREQ_GOV_ONDEMAND=y
+CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
+CONFIG_CPUFREQ_DT=y
+
+
+# -------------------------------------------------------------
+# [3.7] 内存管理（桌面响应速度关键）
+# -------------------------------------------------------------
+# MGLRU：多代 LRU。在 Chromium 多标签 + 4K 播放这类内存压力场景下，
+# 回收决策比传统 LRU 准确得多，卡顿明显减少。这是本次改动中
+# 对「体感流畅度」提升最大的一项。
+CONFIG_LRU_GEN=y
+CONFIG_LRU_GEN_ENABLED=y
+
+# 透明大页：匿名页 always（减少 TLB miss），
+# 并对只读文件页（可执行段）启用 THP —— 对 Chromium/GNOME 这类
+# 巨大二进制的指令 TLB 命中率有实际帮助。
+CONFIG_TRANSPARENT_HUGEPAGE=y
+CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS=y
+CONFIG_READ_ONLY_THP_FOR_FS=y
+
+# PSI：systemd-oomd 与现代桌面资源管理依赖它；
+# 没有 PSI 时 systemd-oomd 会直接启动失败。
+# 若要做极限跑分可用内核参数 psi=0 关闭。
+CONFIG_PSI=y
+CONFIG_PSI_DEFAULT_DISABLED=n
+
+# ZRAM：本机当前无 swap。加一层内存压缩交换作为缓冲，
+# 内存吃紧时不必去写 eMMC。默认 lz4（低延迟优先）。
+CONFIG_ZRAM=m
+CONFIG_ZRAM_BACKEND_LZ4=y
+CONFIG_ZRAM_BACKEND_ZSTD=y
+CONFIG_ZRAM_DEF_COMP_LZ4=y
+CONFIG_ZRAM_WRITEBACK=y
+
+# --- CMA：硬件编解码的关键参数 ---------------------------------
+# defconfig 只给 32MB，本机实测 CmaFree 仅剩 ~23MB。
+# RKVDEC2 4K 解码 + VEPU580 编码 + RGA + DMABUF_HEAPS_CMA 同时工作时
+# 极易分配失败（表现为播放器回退软解、CPU 占用飙升）。
+# 16GB 内存下给 256MB 毫无压力，且 CMA 区域空闲时仍可被 movable 分配复用。
+CONFIG_CMA=y
+CONFIG_DMA_CMA=y
+CONFIG_CMA_SIZE_MBYTES=256
+CONFIG_CMA_SYSFS=y
 
 
 # -------------------------------------------------------------
@@ -78,15 +277,19 @@ CONFIG_SQUASHFS_ZSTD=y
 CONFIG_SQUASHFS_4K_DEVBLK_SIZE=y
 CONFIG_SQUASHFS_EMBEDDED=y
 
-# FAT/exFAT/NTFS（USB 存储等）
+# FAT/exFAT（USB 存储等）
 CONFIG_VFAT_FS=y
 CONFIG_FAT_DEFAULT_UTF8=y
 CONFIG_MSDOS_FS=m
 CONFIG_EXFAT_FS=m
+
+# NTFS3（Paragon 驱动，可读写）
+# ※ 原配置只写了 NTFS3_* 子选项却漏了主开关 CONFIG_NTFS3_FS，
+#   导致这几行一直是死配置，NTFS3 从未被编译。
+CONFIG_NTFS3_FS=m
 CONFIG_NTFS3_64BIT_CLUSTER=y
 CONFIG_NTFS3_LZX_XPRESS=y
 CONFIG_NTFS3_FS_POSIX_ACL=y
-CONFIG_NTFS_FS=m
 
 # Btrfs（快照、子卷）
 CONFIG_BTRFS_FS=m
@@ -112,7 +315,6 @@ CONFIG_PSTORE=y
 CONFIG_NET_IPIP=n
 CONFIG_NET_DSA=n
 CONFIG_HSR=n
-CONFIG_QRTR=n
 CONFIG_NET_9P=n
 CONFIG_WAN=n
 CONFIG_WWAN=n
@@ -131,8 +333,7 @@ CONFIG_NF_CONNTRACK=y
 CONFIG_NF_NAT=y
 CONFIG_NETFILTER_XTABLES=y
 
-# ========== 关键：开启传统iptables兼容层（解决 TABLE_ADD failed: table filter 核心报错） ==========
-# 老式 iptables 表支持（filter/mangle/nat）
+# ========== 传统 iptables 兼容层（解决 TABLE_ADD failed: table filter） ==========
 CONFIG_IP_NF_FILTER=m          # IPv4 filter 表，UFW 核心依赖
 CONFIG_IP_NF_NAT=m             # IPv4 NAT 表
 CONFIG_IP_NF_MANGLE=m          # IPv4 mangle 表
@@ -144,10 +345,9 @@ CONFIG_IP6_NF_MANGLE=m         # IPv6 mangle 表
 CONFIG_NETFILTER_XTABLES_COMPAT=y
 CONFIG_NETFILTER_XTABLES_LEGACY=y
 
-# nftables 表类型（iptables-nft 后端必备，修复 TABLE_ADD failed: table filter）
+# nftables 表类型（iptables-nft 后端必备）
 CONFIG_NF_TABLES_IPV4=y
 CONFIG_NF_TABLES_IPV6=y
-CONFIG_NFT_FILTER=m
 CONFIG_NFT_NAT=m
 CONFIG_NFT_MASQ=m
 CONFIG_NFT_REDIR=m
@@ -164,45 +364,44 @@ CONFIG_IP6_NF_MATCH_RT=m
 # Netlink 日志通道（修复 LOG 扩展不生效）
 CONFIG_NETFILTER_NETLINK_LOG=y
 
-# ========== 连接跟踪增强（修复 conntrack 模块警告） ==========
+# ========== 连接跟踪增强 ==========
 CONFIG_NF_CONNTRACK_PROCFS=y   # /proc/net/nf_conntrack 接口
 CONFIG_NF_CONNTRACK_MARK=y     # 连接标记支持
 CONFIG_NF_CONNTRACK_ZONES=y    # 连接分区（容器网络必备）
 
-# ========== UFW 必备匹配模块（修复各类 Extension xxx not supported 警告） ==========
-# 基础协议匹配
-CONFIG_NETFILTER_XT_MATCH_TCP=m        # TCP 协议匹配
-CONFIG_NETFILTER_XT_MATCH_UDP=m        # UDP 协议匹配
-CONFIG_NETFILTER_XT_MATCH_ICMP=m       # ICMP 协议匹配
-CONFIG_NETFILTER_XT_MATCH_ICMPV6=m     # ICMPv6 协议匹配
-
-# 状态/连接匹配
-CONFIG_NETFILTER_XT_MATCH_CONNTRACK=m  # 连接跟踪匹配（原有保留）
+# ========== UFW 必备匹配模块 ==========
+# ※ tcp/udp/icmp/icmpv6 匹配已内建于 x_tables 核心，没有独立的
+#   CONFIG_NETFILTER_XT_MATCH_TCP/UDP/ICMP/ICMPV6 符号，
+#   原文件那 4 行为死配置，已删除。
+CONFIG_NETFILTER_XT_MATCH_CONNTRACK=m  # 连接跟踪匹配
 CONFIG_NETFILTER_XT_MATCH_STATE=m      # 连接状态匹配（state related/established）
-
-# 功能匹配
-CONFIG_NETFILTER_XT_MATCH_LIMIT=m      # 速率限制（修复 limit 扩展缺失）
-CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=m   # 地址类型匹配（原有保留）
+CONFIG_NETFILTER_XT_MATCH_LIMIT=m      # 速率限制
+CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=m   # 地址类型匹配
 CONFIG_NETFILTER_XT_MATCH_MULTIPORT=m  # 多端口匹配
 CONFIG_NETFILTER_XT_MATCH_MAC=m        # MAC 地址匹配
-CONFIG_NETFILTER_XT_MATCH_MARK=m       # 标记匹配（原有保留）
+CONFIG_NETFILTER_XT_MATCH_MARK=m       # 标记匹配
+CONFIG_NETFILTER_XT_MATCH_COMMENT=m    # 规则注释，排错更方便
 
-# ========== UFW 必备目标模块（修复 REJECT/LOG 目标缺失） ==========
-CONFIG_NETFILTER_XT_TARGET_LOG=m       # 日志目标（原有保留）
-CONFIG_IP_NF_TARGET_REJECT=m           # IPv4 拒绝目标（UFW 默认拒绝策略核心）
-CONFIG_IP6_NF_TARGET_REJECT=m          # IPv6 拒绝目标
+# ========== UFW 必备目标模块 ==========
+CONFIG_NETFILTER_XT_TARGET_LOG=m        # 日志目标
+CONFIG_IP_NF_TARGET_REJECT=m            # IPv4 拒绝目标（UFW 默认拒绝策略核心）
+CONFIG_IP6_NF_TARGET_REJECT=m           # IPv6 拒绝目标
 CONFIG_NETFILTER_XT_TARGET_MASQUERADE=m # 地址伪装（NAT/共享上网）
-CONFIG_NETFILTER_XT_TARGET_REDIRECT=m  # 端口重定向
-CONFIG_NETFILTER_XT_TARGET_DNAT=m      # 目的地址转换（端口转发）
+CONFIG_NETFILTER_XT_TARGET_REDIRECT=m   # 端口重定向
+# ※ DNAT/SNAT 目标由 CONFIG_NETFILTER_XT_NAT 提供，
+#   原文件写的 CONFIG_NETFILTER_XT_TARGET_DNAT 不存在，为死配置。
+CONFIG_NETFILTER_XT_NAT=m
 
 
 # -------------------------------------------------------------
 # [5.6] 容器网络 & VPN
 # -------------------------------------------------------------
 CONFIG_BRIDGE=m
+CONFIG_BRIDGE_NETFILTER=m          # 桥接层防火墙，Docker 端口映射依赖
 CONFIG_VETH=y
 CONFIG_TUN=y
 CONFIG_WIREGUARD=m
+# WireGuard 的 ChaCha20/Poly1305 已由 CRYPTO_LIB_*_ARCH 走 NEON 加速路径
 
 
 # -------------------------------------------------------------
@@ -210,54 +409,58 @@ CONFIG_WIREGUARD=m
 # -------------------------------------------------------------
 # ========== TCP 性能与拥塞控制 ==========
 CONFIG_TCP_CONG_ADVANCED=y
-CONFIG_TCP_BBR=m                  # BBR 拥塞控制，高带宽/长距离网络必备
+# ※ 原文件写的是 CONFIG_TCP_BBR，该符号不存在，BBR 实际从未被编译进内核。
+#   正确符号是 CONFIG_TCP_CONG_BBR。
+CONFIG_TCP_CONG_BBR=m              # BBR 拥塞控制，2.5GbE 上收益明显
 CONFIG_NET_SCH_FQ=m                # FQ 队列调度，配合 BBR 发挥最佳性能
 CONFIG_DEFAULT_TCP_CONG="cubic"    # 默认用 cubic（稳定兼容），系统内可切换 BBR
-CONFIG_SYN_COOKIES=y               # 防 SYN 洪水攻击，公网服务器必备
+CONFIG_SYN_COOKIES=y               # 防 SYN 洪水攻击
 
 # ========== 网络高可用与隔离 ==========
-CONFIG_BONDING=m                   # 网卡绑定/链路聚合，多网口冗余
-CONFIG_VLAN_8021Q=m                # 802.1Q VLAN 划分，网络分段隔离
+CONFIG_BONDING=m                   # 网卡绑定（本机两个 2.5GbE 口可做聚合）
+CONFIG_VLAN_8021Q=m                # 802.1Q VLAN 划分
 CONFIG_VXLAN=m                     # VXLAN 隧道，Docker/K8s 网络插件必备
 
 # ========== VPN/IPsec 支持 ==========
+# ※ CONFIG_INET_XFRM_MODE_TRANSPORT / _TUNNEL 在 4.14 已并入 xfrm 核心，
+#   原文件那两行为死配置，已删除。
 CONFIG_XFRM_USER=m
 CONFIG_INET_ESP=m
-CONFIG_INET_XFRM_MODE_TRANSPORT=m
-CONFIG_INET_XFRM_MODE_TUNNEL=m
-
-# ========== 运维友好扩展 ==========
-CONFIG_BRIDGE_NETFILTER=y          # 桥接层防火墙，Docker 端口映射依赖
-CONFIG_NETFILTER_XT_MATCH_COMMENT=m# iptables/nftables 规则注释，排错更方便
-CONFIG_NF_TABLES_SET=y             # nftables 集合，高效黑白名单
 
 
 # -------------------------------------------------------------
 # [6] USB
 # -------------------------------------------------------------
-CONFIG_USB_CONN_GPIO=m
 CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
 
 # 固件加载器
 CONFIG_FW_LOADER_COMPRESS=y
 CONFIG_FW_LOADER_COMPRESS_ZSTD=y
 
+
 # -------------------------------------------------------------
-# [6.5] 存储：AHCI / SATA（JMB582 PCIe→SATA）
+# [6.5] 存储：NVMe / AHCI / SATA（M.2 插槽）
 # -------------------------------------------------------------
+CONFIG_BLK_DEV_NVME=m       # M.2 NVMe SSD
 CONFIG_ATA=y
 CONFIG_SATA_AHCI=y          # AHCI 标准驱动（JMB582 用这个即可）
 CONFIG_SATA_PMP=y           # 支持 Port Multiplier
 CONFIG_SCSI=y               # AHCI 依赖的 SCSI 层
 CONFIG_BLK_DEV_SD=y         # 必须，以 /dev/sda 形式出现
 CONFIG_ATA_SFF=n            # 不需要传统 SFF
-CONFIG_PATA_PLATFORM=n      # 不需要 PATA
+
+# 块层调度器：NVMe 建议 none，eMMC/SATA 建议 mq-deadline 或 bfq
+CONFIG_MQ_IOSCHED_DEADLINE=y
+CONFIG_MQ_IOSCHED_KYBER=y
+CONFIG_IOSCHED_BFQ=y
 
 
 # -------------------------------------------------------------
 # [7] 显示器·GPU（Rockchip DRM + Panthor）
 # -------------------------------------------------------------
-CONFIG_DRM_ROCKCHIP=y
+# ※ defconfig 的 CONFIG_DRM 本身是 =m，所以 DRM_ROCKCHIP 无法为 =y。
+#   原文件写 =y 但实际产出一直是 =m，这里改成如实描述。
+CONFIG_DRM_ROCKCHIP=m
 CONFIG_ROCKCHIP_ANALOGIX_DP=y
 CONFIG_ROCKCHIP_DW_HDMI=y
 CONFIG_ROCKCHIP_DW_MIPI_DSI=y
@@ -269,14 +472,20 @@ CONFIG_ROCKCHIP_RGB=y
 # Mali GPU (Panthor = RK3588 的 Mali G610)
 CONFIG_DRM_PANTHOR=m
 
+# GPU 变频：simple_ondemand 为默认；同时编入 performance 以便跑分时锁最高频
+#   echo performance > /sys/class/devfreq/fb000000.gpu/governor
+CONFIG_PM_DEVFREQ=y
+CONFIG_DEVFREQ_GOV_SIMPLE_ONDEMAND=y
+CONFIG_DEVFREQ_GOV_PERFORMANCE=y
+CONFIG_DEVFREQ_THERMAL=y
+
 # HDMI 音频
 CONFIG_SND_SOC_HDMI_CODEC=m
 
 
 # -------------------------------------------------------------
-# [8] 媒体（Video4Linux / RGA / VDEC）
+# [8] 媒体（Video4Linux / RGA / VDEC / VEPU580）
 # -------------------------------------------------------------
-# 桌面用途，使用硬件解码
 CONFIG_MEDIA_SUPPORT=m
 CONFIG_MEDIA_PLATFORM_SUPPORT=y
 CONFIG_MEDIA_PLATFORM_DRIVERS=y
@@ -288,12 +497,12 @@ CONFIG_VIDEO_ROCKCHIP_VDEC=m
 CONFIG_VIDEO_ROCKCHIP_RKVENC=m   # VEPU580 H.265 硬件编码 (out-of-tree patch)
 
 # -------------------------------------------------------------
-# 追加 Chromium 硬件解码支持
+# 硬件解码零拷贝（Chromium / GStreamer）
 # -------------------------------------------------------------
 CONFIG_ROCKCHIP_IOMMU=y         # VPU DMA 访问所必需
 CONFIG_DMABUF_HEAPS=y           # 缓冲区共享（GPU↔VPU间）所必需
 CONFIG_DMABUF_HEAPS_SYSTEM=y    # 同上
-CONFIG_DMABUF_HEAPS_CMA=y       # 同上
+CONFIG_DMABUF_HEAPS_CMA=y       # 同上（尺寸见 [3.7] CMA_SIZE_MBYTES）
 CONFIG_DMA_SHARED_BUFFER=y      # 同上基础
 CONFIG_MEDIA_CONTROLLER=y       # V4L2 媒体控制器
 CONFIG_VIDEO_V4L2_SUBDEV_API=y  # V4L2 子设备 API
@@ -305,16 +514,18 @@ CONFIG_VIDEO_V4L2_SUBDEV_API=y  # V4L2 子设备 API
 CONFIG_SOUND=y
 CONFIG_SND=y
 CONFIG_SND_SOC=m
-CONFIG_SND_SOC_SOF_OF=m
 CONFIG_SND_SOC_GENERIC_DMAENGINE_PCM=y
 CONFIG_SND_SOC_ES8328=m
 CONFIG_SND_SOC_ES8328_I2C=m
 CONFIG_SND_SOC_ES8328_SPI=m
 
-# 不需要 HD-Audio（Rockchip 使用 SoC 内建 I2S/TDM 处理）
-CONFIG_SND_HDA=n
+# SOF (Sound Open Firmware) 是给 Intel/AMD/MTK DSP 用的，Rockchip 走
+# 自带 I2S/TDM + simple-audio-card，完全用不到，关掉可省一大块编译
+CONFIG_SND_SOC_SOF_TOPLEVEL=n
+
+# 不需要 HD-Audio（其来源 SND_HDA_TEGRA 已随 ARCH_TEGRA 一并关闭）
 CONFIG_SND_HDA_INTEL=n
-CONFIG_SND_HDA_CORE=n
+CONFIG_SND_HDA_TEGRA=n
 
 
 # -------------------------------------------------------------
@@ -340,105 +551,104 @@ CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
 
 
 # -------------------------------------------------------------
-# [12] 仅保留必须禁用的项
+# [12] 其他不需要的子系统
 # -------------------------------------------------------------
-# 不需要的子系统（RK3588 SBC 用不到）
 CONFIG_MTD=n
 CONFIG_VFIO=n
 CONFIG_REMOTEPROC=n
-CONFIG_RPMSG=n
+CONFIG_QRTR=n
 CONFIG_GOOGLE_FIRMWARE=n
 CONFIG_CHROME_PLATFORMS=n
 CONFIG_SURFACE_PLATFORMS=n
-CONFIG_FTRACE=n
 
-# 不需要 DVB 网络
+# 不需要 DVB / 调谐器
 CONFIG_DVB_NET=n
 CONFIG_MEDIA_TUNER=n
 
-# 非 Rockchip SoC（排除以加速构建）
-CONFIG_SOC_RENESAS=n
-CONFIG_TEGRA_BPMP=n
-CONFIG_TEGRA_HSP_MBOX=n
-CONFIG_COMMON_CLK_QCOM=n
-CONFIG_COMMON_CLK_RP1=n
-CONFIG_COMMON_CLK_RS9_PCIE=n
-CONFIG_COMMON_CLK_S2MPS11=n
-CONFIG_MISC_RP1=n
+# devfreq-event（DFI）：RK3588 主线尚无 DMC 变频驱动，编译进来也无人使用
 CONFIG_PM_DEVFREQ_EVENT=n
-CONFIG_RESET_RZV2H_USB2PHY=n
-CONFIG_SM_CAMCC_8550=n
-CONFIG_SM_CAMCC_8650=n
-CONFIG_SM_VIDEOCC_8450=n
 
 
 # -------------------------------------------------------------
-# [13] WiFi 驱动
+# [13] 无线：RTL8852BE WiFi 6 + 蓝牙
 # -------------------------------------------------------------
-# RTL8852BE (OPi 5 Plus 板载 WiFi)
+CONFIG_RFKILL=y
 CONFIG_RTW89=m
 CONFIG_RTW89_8852BE=m
 
+# 板载蓝牙走 USB (Realtek 0bda:b85b)，与 WiFi 同为 RTL8852BE combo 芯片
+CONFIG_BT=m
+CONFIG_BT_BREDR=y
+CONFIG_BT_LE=y
+CONFIG_BT_HCIBTUSB=m
+CONFIG_BT_HCIBTUSB_RTL=y
+CONFIG_BT_RFCOMM=m
+CONFIG_BT_BNEP=m
+CONFIG_BT_HIDP=m
+
 
 # -------------------------------------------------------------
-# [14] PWM & 风扇控制
+# [14] PWM & 风扇控制 & 温控
 # -------------------------------------------------------------
-# PWM 框架
 CONFIG_PWM=y
-CONFIG_PWM_SYSFS=y
-
-# Rockchip PWM 控制器
 CONFIG_PWM_ROCKCHIP=y
 
-# PWM FAN 驱动（通过hwmon）
+# PWM FAN 驱动（温控曲线见 overlay/rk3588-pwm-fan.dtsi）
 CONFIG_SENSORS_PWM_FAN=m
-
-# 通用 GPIO FAN（备用）
 CONFIG_SENSORS_GPIO_FAN=m
 
-# 热管理（PWM FAN 可能依赖）
+# 热管理：主动散热良好时才能维持 A76 高频不降频，是「持续高性能」的前提
 CONFIG_THERMAL=y
+CONFIG_THERMAL_OF=y
+CONFIG_ROCKCHIP_THERMAL=m
+CONFIG_CPU_THERMAL=y
 CONFIG_THERMAL_GOV_STEP_WISE=y
+CONFIG_THERMAL_DEFAULT_GOV_STEP_WISE=y
+CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
 CONFIG_THERMAL_GOV_USER_SPACE=y
 
+
 # =============================================================
-# security-addon.txt — 基于原始 my-add.txt 的增量安全补丁
-# 用途：追加到原始 my-add.txt 末尾，不要修改原始配置
+# [15] 安全加固（在性能与安全之间取平衡）
 # =============================================================
 
-# --- AppArmor 默认安全模块 ---
-CONFIG_DEFAULT_SECURITY="apparmor"
-CONFIG_DEFAULT_SECURITY_APPARMOR=y
+# --- LSM ---
 CONFIG_SECURITY_YAMA=y
 CONFIG_SECURITY_LOCKDOWN_LSM=y
 CONFIG_SECURITY_LOCKDOWN_LSM_EARLY=y
-CONFIG_LOCKDOWN_KERNEL=y
-CONFIG_LOCKDOWN_INTEGRITY=y
-CONFIG_LOCKDOWN_CONFIDENTIALITY=y
 CONFIG_LSM="lockdown,yama,apparmor"
+# ※ 原文件的 CONFIG_LOCKDOWN_KERNEL / _INTEGRITY / _CONFIDENTIALITY 三个符号
+#   并不存在（真名是 CONFIG_LOCK_DOWN_KERNEL_FORCE_*），一直未生效。
+#   这其实是好事：强制 lockdown 会禁掉 perf、kexec、/dev/mem 和部分调试接口，
+#   桌面用途弊大于利。保持默认的 FORCE_NONE，需要时用内核参数 lockdown= 即可。
 
 # --- SLAB / 内存加固 ---
 CONFIG_SLAB_FREELIST_RANDOM=y
 CONFIG_SLAB_FREELIST_HARDENED=y
-CONFIG_SLUB_CPU_PARTIAL=y
 CONFIG_HARDENED_USERCOPY=y
-CONFIG_HARDENED_USERCOPY_FALLBACK=n
 CONFIG_FORTIFY_SOURCE=y
-CONFIG_INIT_ON_ALLOC_DEFAULT_ON=y
-CONFIG_INIT_ON_FREE_DEFAULT_ON=y
 CONFIG_INIT_STACK_ALL_ZERO=y
 
+# 分配时清零：代价约 1%，与 Ubuntu 官方内核一致，保留。
+CONFIG_INIT_ON_ALLOC_DEFAULT_ON=y
+
+# ★ 释放时清零：本次改动中单项性能收益最大的一处。
+#   INIT_ON_FREE 会在每次释放页/slab 时整片 memset，内存密集型负载
+#   （编译、浏览器、视频解码缓冲反复申请释放）损失可达 5~15%，
+#   而它相对 INIT_ON_ALLOC 提供的额外防护很有限。
+#   功能仍编译在内核里，需要时加内核参数 init_on_free=1 即可恢复。
+CONFIG_INIT_ON_FREE_DEFAULT_ON=n
+
 # --- 内核文本保护 ---
+# ※ CONFIG_DEBUG_RODATA / CONFIG_DEBUG_SET_MODULE_RONX 是 4.11 以前的旧名，
+#   现名即下面两项，原文件那两行为死配置。
 CONFIG_STRICT_KERNEL_RWX=y
 CONFIG_STRICT_MODULE_RWX=y
-CONFIG_DEBUG_RODATA=y
-CONFIG_DEBUG_SET_MODULE_RONX=y
 
 # --- 禁用危险接口 ---
 CONFIG_DEVMEM=n
-CONFIG_DEVKMEM=n
 
-# --- 模块签名（不强制，兼容 out-of-tree 驱动）---
+# --- 模块签名（不强制，兼容 out-of-tree / DKMS 驱动）---
 CONFIG_MODULE_SIG=y
 CONFIG_MODULE_SIG_ALL=y
 CONFIG_MODULE_SIG_SHA512=y
@@ -446,16 +656,15 @@ CONFIG_MODULE_SIG_HASH="sha512"
 
 # --- 密钥与完整性度量 ---
 CONFIG_KEYS=y
-CONFIG_ENCRYPTED_KEYS=m
 CONFIG_KEY_DH_OPERATIONS=y
 CONFIG_SYSTEM_BLACKLIST_KEYRING=y
 CONFIG_SYSTEM_DATA_VERIFICATION=y
 
-# IMA/EVM
+# IMA/EVM：未加载策略时基本处于空转状态，运行时开销可忽略，予以保留。
+# （RK3588 无 TPM，若确定用不到可整段删除，能再省一点内核体积）
 CONFIG_IMA=y
 CONFIG_IMA_MEASURE_PCR_IDX=10
 CONFIG_IMA_LSM_RULES=y
-CONFIG_IMA_TEMPLATE=y
 CONFIG_IMA_NG_TEMPLATE=y
 CONFIG_IMA_DEFAULT_TEMPLATE="ima-ng"
 CONFIG_IMA_DEFAULT_HASH_SHA256=y
@@ -464,30 +673,32 @@ CONFIG_IMA_WRITE_POLICY=y
 CONFIG_IMA_READ_POLICY=y
 CONFIG_IMA_APPRAISE=y
 CONFIG_IMA_APPRAISE_BOOTPARAM=y
-CONFIG_IMA_TRUSTED_KEYRING=y
-CONFIG_IMA_KEYRINGS_PERMIT_SIGNED_BY_BUILTIN_OR_TRUSTED=y
 CONFIG_EVM=y
 CONFIG_EVM_ATTR_FSUUID=y
-CONFIG_EVM_EXTRA_SMACK_XATTRS=y
-CONFIG_EVM_LOAD_X509=y
 
-# --- 调试与追踪（恢复，替代原始 CONFIG_FTRACE=n）---
+# --- 调试与追踪 ---
+# 保留 ftrace/kprobe/uprobe/BPF（perf、bpftrace 等性能分析工具依赖），
+# 但去掉几项纯开销、对本平台无意义的追踪器。
 CONFIG_FTRACE=y
 CONFIG_FUNCTION_TRACER=y
 CONFIG_FUNCTION_GRAPH_TRACER=y
 CONFIG_DYNAMIC_FTRACE=y
-CONFIG_DYNAMIC_FTRACE_WITH_REGS=y
 CONFIG_STACK_TRACER=y
 CONFIG_SCHED_TRACER=y
-CONFIG_HWLAT_TRACER=y
-CONFIG_MMIOTRACE=y
 CONFIG_KPROBES=y
-CONFIG_KPROBES_ON_FTRACE=y
 CONFIG_UPROBES=y
 CONFIG_DYNAMIC_DEBUG=y
 CONFIG_DEBUG_FS=y
 CONFIG_DEBUG_KERNEL=y
-CONFIG_DEBUG_MISC=y
+# 硬件延迟检测器会常驻一个把 CPU 跑满的内核线程做采样，桌面用不到
+CONFIG_HWLAT_TRACER=n
+# 杂项运行时调试检查，纯开销
+CONFIG_DEBUG_MISC=n
+# seccomp 缓存调试：systemd / Chromium 全程跑在 seccomp 过滤下，
+# 这项 DEBUG 统计毫无必要
+CONFIG_SECCOMP_CACHE_DEBUG=n
+# ※ CONFIG_MMIOTRACE、CONFIG_KPROBES_ON_FTRACE、CONFIG_DYNAMIC_FTRACE_WITH_REGS
+#   均为 x86 专有或已改名（arm64 用 WITH_ARGS），原文件那几行为死配置。
 
 # BPF 扩展
 CONFIG_BPF_STREAM_PARSER=y
@@ -497,10 +708,8 @@ CONFIG_BPF_PRELOAD=y
 CONFIG_BPF_PRELOAD_UMD=m
 
 # --- 容器网络增强 ---
-CONFIG_VHOST_NET=m
-CONFIG_VHOST_VSOCK=m
 CONFIG_VHOST=m
-CONFIG_VHOST_CROSS_ENDIAN_LEGACY=y
+CONFIG_VHOST_NET=m
 CONFIG_IPVLAN=m
 CONFIG_IPVTAP=m
 CONFIG_GENEVE=m
@@ -535,9 +744,7 @@ CONFIG_F2FS_FS_LZO=y
 CONFIG_F2FS_FS_LZORLE=y
 CONFIG_F2FS_FS_LZ4=y
 CONFIG_F2FS_FS_ZSTD=y
-CONFIG_F2FS_FS_LZMA=y
 CONFIG_FS_ENCRYPTION=y
-CONFIG_FS_ENCRYPTION_ALGS=m
 CONFIG_FS_VERITY=y
 CONFIG_FS_VERITY_BUILTIN_SIGNATURES=y
 
@@ -555,8 +762,71 @@ CONFIG_NET_SCH_TAPRIO=m
 
 # --- 其他 Ubuntu 原生功能 ---
 CONFIG_USERFAULTFD=y
-CONFIG_MEM_SOFT_DIRTY=y
 CONFIG_CHECKPOINT_RESTORE=y
 CONFIG_COMPAT_32BIT_TIME=y
-CONFIG_ARCH_HAS_SYSCALL_WRAPPER=y
-CONFIG_SECCOMP_CACHE_DEBUG=y
+CONFIG_IO_URING=y
+
+
+# =============================================================
+# [16] 本机硬件驱动锁定
+# -------------------------------------------------------------
+# 放在文件最末尾：merge_config 采用「后者覆盖前者」，
+# 这样上面 [2] 的平台裁剪无论如何都不会误伤实际在用的设备。
+# 内容对应 lspci / lsusb / lsblk 的实测结果。
+# =============================================================
+
+# --- 2x RTL8125 2.5GbE (PCIe 0003:31:00.0 / 0004:41:00.0) ---
+CONFIG_PCI=y
+CONFIG_PCIEPORTBUS=y
+CONFIG_PCI_MSI=y
+CONFIG_NET_VENDOR_REALTEK=y
+CONFIG_R8169=m
+CONFIG_REALTEK_PHY=y
+
+# --- RK3588 PCIe 控制器与 PHY（WiFi / 双网卡 / M.2 全靠它）---
+CONFIG_PCIE_ROCKCHIP_DW=y
+CONFIG_PCIE_ROCKCHIP_DW_HOST=y
+CONFIG_PHY_ROCKCHIP_SNPS_PCIE3=y
+CONFIG_PHY_ROCKCHIP_NANENG_COMBO_PHY=y
+
+# --- eMMC 233GB（根文件系统所在，HS400 + 命令队列直接决定 IO 性能）---
+CONFIG_MMC=y
+CONFIG_MMC_BLOCK=y
+CONFIG_MMC_SDHCI=y
+CONFIG_MMC_SDHCI_PLTFM=y
+CONFIG_MMC_SDHCI_OF_DWCMSHC=y   # RK3588 eMMC 控制器
+CONFIG_MMC_DW=y
+CONFIG_MMC_DW_ROCKCHIP=y        # SD 卡控制器
+CONFIG_MMC_CQHCI=y              # eMMC 命令队列（HS400 高队列深度性能关键）
+CONFIG_MMC_HSQ=y                # 软件高速队列
+CONFIG_PHY_ROCKCHIP_EMMC=y      # eMMC PHY，HS400 必需
+
+# --- USB 3.0 (GL3523 Hub) ---
+CONFIG_USB=y
+CONFIG_USB_XHCI_HCD=y
+CONFIG_USB_XHCI_PLATFORM=y
+CONFIG_USB_DWC3=y
+CONFIG_USB_DWC3_OF_SIMPLE=y
+CONFIG_PHY_ROCKCHIP_INNO_USB2=y
+CONFIG_PHY_ROCKCHIP_USBDP=m
+CONFIG_USB_STORAGE=m
+CONFIG_USB_UAS=m
+CONFIG_USB_CONN_GPIO=y
+
+# --- Type-C / DP Alt Mode ---
+CONFIG_TYPEC=m
+CONFIG_TYPEC_DP_ALTMODE=m
+CONFIG_PHY_ROCKCHIP_TYPEC=y
+
+# --- HDMI 输出 PHY (RK3588 Samsung HDPTX) ---
+CONFIG_PHY_ROCKCHIP_SAMSUNG_HDPTX=m
+
+# --- 输入设备（桌面必需）---
+CONFIG_INPUT_EVDEV=y
+CONFIG_HID_GENERIC=y
+CONFIG_USB_HID=y
+CONFIG_HID_MULTITOUCH=m
+
+# --- RTC / 硬件监控 ---
+CONFIG_RTC_DRV_HYM8563=m
+CONFIG_HWMON=y
