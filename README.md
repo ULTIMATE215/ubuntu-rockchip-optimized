@@ -8,42 +8,108 @@
 
 - **完全主线的图形驱动**:
   Mesa 26.0 (Panfrost/PanVK) 100% 发挥 Mali-G610 GPU 的潜力，在 GNOME (Wayland) 桌面环境下实现丝滑般流畅的渲染。
-- **高效的硬件视频解码**:
+- **高效的硬件视频编解码**:
   Linux 7.1 内核的 V4L2 Request API 与 GStreamer 1.28+ (v4l2codecs) 直接联动。支持低发热、低CPU负载下的4K视频播放。
+  并通过 out-of-tree 补丁集成 **VEPU580 硬件编码**（H.265），配套的 MPP 用户态库已预装进 rootfs。
 - **极致的极简主义 (1.6 GB)**:
   将内核压缩到极限，压缩后镜像大小仅 **1.6 GB (xz)**。
 - **100% Snap-Free**:
   完全排除 Ubuntu 标准的 Snap 守护进程及 Snap 应用。将系统开销降至极致。（之后安装 snapd 也可正常运行）
 - **Panthor 优化构建**:
   为轻量化，采用 Mesa 重构版本及 Ubuntu 标准版、Freedesktop Mesa 26.0 版两种类型。
-- **双内核配置**:
-  一个镜像收录 `7.1.2-ondemand`（高性能）和 `7.1.2-conservative`（省电、低发热）两种内核。启动时可根据用途选择。
+- **可选的内核模式**:
+  内核按 CPUFreq governor 分为 `ondemand` / `conservative` / `performance` / `schedutil` 四种，
+  构建时自由勾选，可同时收录多个到一个镜像里，启动时选择。详见下方「构建」与「CPU Governor」两节。
 - **洁净构建环境**:
   U-Boot、内核、Mesa、rootfs 分别在独立的洁净环境（systemd-nspawn）中构建。排除构建环境污染，生成高再现性的最高品质二进制文件。
 
-## 🛠️ 内核优化（已禁用的组件）
+## 🛠️ 内核优化
 
-本镜像为追求作为服务器/专用桌面的纯粹性能，在内核级别禁用以下不需要的功能，最小化内存占用和构建体积。
+内核配置集中在 `my-add.txt`（kconfig 片段，由 `merge_config.sh` 与 `make defconfig` 合并）。
+配置以 Orange Pi 5 Plus / RK3588 实机实测为准调优。
 
-- **网络相关**: Wi-Fi, Bluetooth, IPv6, Netfilter (防火墙), VLAN, DVB_NET, CAN 总线
-- **文件系统**: NFS (Network File System)
-- **输入设备**: 手柄、数位板、触摸屏
-- **不需要的子系统**: `CONFIG_FTRACE` (调试追踪), `CONFIG_SND_HDA` (不需要的音频驱动), kdump-tools, 其他不需要的PHY驱动群
-- **硬件加速增强**: 启用 `CONFIG_DMABUF_HEAPS`·`CONFIG_ROCKCHIP_IOMMU`，实现 GPU↔VPU 之间的零拷贝缓冲传输。优化 Chromium 硬件解码。
-- **AHCI/SATA支持**: 支持M.2插槽通过 PCIe→SATA 转换（JMB582等）。
+### 硬件加速
+
+- **零拷贝缓冲**: `CONFIG_DMABUF_HEAPS` + `CONFIG_ROCKCHIP_IOMMU`，GPU↔VPU 之间零拷贝传输，优化 Chromium 硬件解码
+- **CMA 256MB**: defconfig 默认仅 32MB，实测 4K 硬解 + RGA + DMABUF 同时工作时极易分配失败并静默回退软解
+- **硬件编码**: `CONFIG_VIDEO_ROCKCHIP_RKVENC`（VEPU580，来自 `kernel-patches/` 下的 out-of-tree 补丁）
+- **存储**: NVMe、eMMC HS400 + 命令队列（CQE）、M.2 PCIe→SATA 转换（JMB582 等）
+
+### 桌面响应速度
+
+- **MGLRU** (`CONFIG_LRU_GEN`): 多标签浏览器 + 视频播放等内存压力场景下回收决策更准，卡顿明显减少
+- **HZ=1000 + PREEMPT_DYNAMIC**: 可用内核参数 `preempt=full|lazy|voluntary|none` 运行时调整
+- **透明大页**: 匿名页 always，并对只读文件页（可执行段）启用
+- **PSI**: systemd-oomd 依赖，缺失会导致其启动失败
+
+### 已禁用的组件
+
+- **非 Rockchip 平台**: `make defconfig` 会打开 52 个 arm64 SoC 平台族，全部关闭以缩短构建时间、减小模块与 DTB 体积
+- **ARMv8.2 用不到的扩展**: Cortex-A76/A55 不具备 PAC / BTI / MTE / SVE / SME，关闭以减小内核 text 与 I-cache 压力
+- **不需要的子系统**: MTD、VFIO、REMOTEPROC、RPMSG、CAN 总线、DVB_NET、调谐器、SND_HDA、SOF、休眠(HIBERNATION)
+
+> **注意**: 早期版本曾禁用 Wi-Fi、蓝牙、IPv6、Netfilter、VLAN、NFS，
+> **这些现已全部启用**——防火墙（UFW / nftables / iptables 全兼容）、
+> RTL8852BE Wi-Fi 6 与蓝牙、2.5GbE 网络高可用、WireGuard、容器网络均可正常使用。
+
+## 🔨 构建
+
+### GitHub Actions（仅构建内核）
+
+在 Actions 页面手动触发 `kernel-only-build`，勾选需要的内核模式即可，
+可多选，产出的 `.deb` 会作为 artifact 上传。
+
+| 勾选项 | 默认 | 说明 |
+|---|---|---|
+| `gov_ondemand` | ✅ | 性能与功耗平衡 |
+| `gov_conservative` | ✅ | 省电 / 防过热 |
+| `gov_performance` | ⬜ | 最高性能 |
+| `gov_schedutil` | ⬜ | 不推荐，见下节实测 |
+
+### 本地完整构建（内核 + Mesa + rootfs + 磁盘镜像）
+
+```bash
+sudo ./main-control.sh <mesa变体>
+
+# 指定内核模式（默认 conservative,ondemand）
+KERNEL_GOVS=ondemand,performance sudo ./main-control.sh <mesa变体>
+
+# 构建 server 版 rootfs（默认 desktop）
+BUILD_TYPE=server sudo ./main-control.sh <mesa变体>
+```
+
+U-Boot、内核、Mesa、rootfs 分别在独立的 systemd-nspawn 洁净环境中构建，排除构建环境污染。
 
 ## ⚡ 关于 CPU Governor
 
-本镜像根据用途收录2种内核。
+内核按 governor 分为多个版本，同一镜像内可收录多个。
+为从 U-Boot 启动指定版本，请将 `/boot/extlinux/extlinux.conf` 的 `default` 改为对应的 `l0` / `l1` … 后重启。
 
 | Governor | 特性 | 推荐用途 |
 |---|---|---|
-| **ondemand** | 高负载时立即响应最大频率 | 3D图形·游戏 |
+| **performance** | 始终锁定最高频率 | 最高性能·跑分 |
+| **ondemand** | 高负载时立即响应最大频率 | 3D图形·游戏（推荐默认） |
 | **conservative** | 仅提升所需的频率 | 视频播放·省电·夏季防过热 |
-
-为从 U-Boot 启动，请将 `/boot/extlinux/extlinux.conf` 的 `default` 更改为 `l0` 或 `l1` 后重启。
+| **schedutil** | 按调度器平均利用率定频 | **不推荐**，见下方实测 |
 
 ## 📊 实测性能数据
+
+### Governor 对比（Orange Pi 5 Plus, Linux 7.1.5）
+
+突发负载测试：单线程在 A76 核心上执行 20ms 计算 + 60ms 空闲，重复 45 轮取中位数，
+模拟 GUI 帧循环 / 浏览器滚动这类交互场景。频率驻留由 cpufreq `time_in_state` 精确统计。
+
+| Governor | 突发耗时(中位) | 平均频率 | 满频占比 | 持续满载吞吐 |
+|---|---|---|---|---|
+| **performance** | **20.0 ms** | 2400 MHz | 100% | ~2700 Mops/s |
+| **ondemand** | 25.0 ms | 1720 MHz | 32% | ~2700 Mops/s |
+| **schedutil** | 37.9 ms | 1210 MHz | 0% | ~2700 Mops/s |
+
+- **持续满载时三者完全等价**——都锁在最高频，差异全在突发/交互负载上。
+- **schedutil 慢 89% 且全程摸不到满频**。它按 PELT 平均利用率定频，25% 占空比的任务只分到 ~1.2GHz。
+  能量模型确实注册成功、EAS 也确实激活（`sched_energy_aware=1`），但 EAS 只影响任务在哪个簇上运行，
+  不影响调频激进程度。唯一能纠正的 uclamp 提频机制需要 `CONFIG_UCLAMP_TASK`，且通用 Ubuntu 桌面
+  没有任何组件会去设置 `uclamp.min`——这正是 Android 能用好 schedutil 而桌面发行版不能的原因。
 
 ### glmark2-es2-wayland 得分
 
