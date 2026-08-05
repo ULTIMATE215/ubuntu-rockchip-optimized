@@ -85,8 +85,9 @@ jobs:
             CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND; do
             grep -Fx "${symbol}=y" overlay/2-config.txt
           done
-          cmdline_path="$(tar -tzf overlay/ubuntu.rootfs.tar.gz | grep -E '(^|^\./)etc/kernel/cmdline$' | head -n1)"
-          service_path="$(tar -tzf overlay/ubuntu.rootfs.tar.gz | grep -E '(^|^\./)etc/systemd/system/r8169-disable-eee.service$' | head -n1)"
+          tar -tzf overlay/ubuntu.rootfs.tar.gz > "$RUNNER_TEMP/rootfs-files.txt"
+          cmdline_path="$(awk '/(^|^\.\/)etc\/kernel\/cmdline$/{print; exit}' "$RUNNER_TEMP/rootfs-files.txt")"
+          service_path="$(awk '/(^|^\.\/)etc\/systemd\/system\/r8169-disable-eee.service$/{print; exit}' "$RUNNER_TEMP/rootfs-files.txt")"
           test -n "$cmdline_path"
           test -n "$service_path"
           tar -xOzf overlay/ubuntu.rootfs.tar.gz "$cmdline_path" | grep -F 'pcie_aspm=off'
@@ -101,6 +102,7 @@ jobs:
           ls -lah images overlay kernel 2>/dev/null || true
 
       - name: Upload system image
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ubuntu-resolute-orangepi-5-plus-linux-7.1.6-aspm-off
