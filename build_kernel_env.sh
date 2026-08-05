@@ -137,6 +137,7 @@ ${build_cmds}"
 mkdir -p kernel
 cp arm64/*.deb kernel
 cp arm64/2-config.txt overlay
+cp arm64/kernel-source.txt overlay
 fi
 
 if [ $mem_size -gt 13 ]; then
@@ -144,4 +145,3 @@ if [ $mem_size -gt 13 ]; then
 	sleep 2
 fi 
 exit 0
-

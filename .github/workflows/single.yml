@@ -13,7 +13,7 @@ on:
       gov_conservative:
         description: 'conservative — 省电 / 防过热，夏季推荐'
         type: boolean
-        default: true
+        default: false
       gov_performance:
         description: 'performance — 最高性能，突发负载比 ondemand 快 25%（实测 20.0ms）'
         type: boolean

@@ -136,12 +136,63 @@ systemd-nspawn -D $1 \
   --setenv=DEBIAN_FRONTEND=noninteractive \
   --setenv=DEBCONF_NONINTERACTIVE_SEEN=true \
   /bin/bash -c "echo 'kdump-tools kdump-tools/use_kdump boolean false' | debconf-set-selections && \
-  sudo apt-get -y install linux-firmware aptdaemon initramfs-tools vim cloud-guest-utils e2fsprogs sudo openssh-server curl wget git htop net-tools build-essential ca-certificates ufw locales lm-sensors"
+  sudo apt-get -y install linux-firmware aptdaemon initramfs-tools vim cloud-guest-utils e2fsprogs sudo openssh-server curl wget git htop net-tools ethtool build-essential ca-certificates ufw locales lm-sensors"
 
 # 生成中文 locale
 systemd-nspawn -D $1 --resolv-conf=replace-host --as-pid2 /bin/bash -c "
     echo 'zh_CN.UTF-8 UTF-8' >> /etc/locale.gen && locale-gen
 "
+
+# RTL8125 使用 r8169 时关闭 EEE，规避空闲后的首包唤醒延迟。
+mkdir -p "$1/usr/local/sbin" "$1/etc/systemd/system/network-pre.target.wants"
+cat > "$1/usr/local/sbin/disable-r8169-eee" << 'EOF'
+#!/bin/sh
+set -u
+
+ethtool_bin="$(command -v ethtool || true)"
+[ -n "$ethtool_bin" ] || exit 0
+
+for attempt in 1 2 3 4 5; do
+    found=0
+    for netdev in /sys/class/net/*; do
+        [ -e "$netdev/device/driver" ] || continue
+        driver="$(basename "$(readlink -f "$netdev/device/driver")")"
+        [ "$driver" = "r8169" ] || continue
+
+        found=1
+        iface="$(basename "$netdev")"
+        if "$ethtool_bin" --set-eee "$iface" eee off; then
+            echo "Disabled EEE on r8169 interface $iface"
+        else
+            echo "Unable to disable EEE on $iface; continuing" >&2
+        fi
+    done
+    [ "$found" -eq 1 ] && exit 0
+    sleep 1
+done
+
+exit 0
+EOF
+chmod 0755 "$1/usr/local/sbin/disable-r8169-eee"
+
+cat > "$1/etc/systemd/system/r8169-disable-eee.service" << 'EOF'
+[Unit]
+Description=Disable Energy Efficient Ethernet on r8169 interfaces
+Documentation=man:ethtool(8)
+Wants=systemd-udev-settle.service
+After=systemd-udev-settle.service
+Before=network-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/disable-r8169-eee
+RemainAfterExit=yes
+
+[Install]
+WantedBy=network-pre.target
+EOF
+ln -sf ../r8169-disable-eee.service \
+    "$1/etc/systemd/system/network-pre.target.wants/r8169-disable-eee.service"
 
 # 编译安装 MPP 库（RK3588 硬件编码器用户态驱动）
 systemd-nspawn -D $1 \
@@ -205,7 +256,7 @@ systemd-nspawn -D $1 \
   /bin/bash -c "sudo apt-get -y install libpciaccess0 libxcb-shm0 libxcb-xfixes0 libvulkan1 libxshmfence1 libxxf86vm1 libx11-6"
 
 # Now install custom deb packages with all dependencies available
-systemd-nspawn -D $1 --resolv-conf=replace-host --as-pid2 sudo /bin/bash -c "cd kkk && sudo dpkg -i *.deb && sudo dpkg -i kernel/*ondemand*.deb && sudo dpkg -i kernel/*conservative*.deb"
+systemd-nspawn -D $1 --resolv-conf=replace-host --as-pid2 sudo /bin/bash -c "cd kkk && sudo dpkg -i *.deb && sudo dpkg -i kernel/*.deb"
 
 
 
@@ -216,7 +267,8 @@ echo "kernel_version=$kernel_version" > overlay/kernel_version
 systemd-nspawn -D $1 --resolv-conf=replace-host --as-pid2 sudo apt-get -y install u-boot-tools u-boot-menu
 
 # Default kernel command line arguments
-echo -n "rootwait rw console=ttyS2,1500000 console=tty1 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory" > $1/etc/kernel/cmdline
+# 测试版默认关闭 PCIe ASPM，规避 RK3588 + RTL8125/r8169 空闲唤醒卡顿。
+echo -n "rootwait rw console=ttyS2,1500000 console=tty1 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory pcie_aspm=off" > $1/etc/kernel/cmdline
 echo -n " quiet splash plymouth.ignore-serial-consoles" >> $1/etc/kernel/cmdline
 
 # Override u-boot-menu config

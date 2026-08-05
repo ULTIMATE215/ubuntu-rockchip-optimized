@@ -124,17 +124,27 @@ CONFIG_HIBERNATION=n
 # -------------------------------------------------------------
 CONFIG_NR_CPUS=8
 
-# 时钟频率 1000Hz：桌面/GUI 的调度粒度与帧节奏更细腻。
-# 配合 NO_HZ_IDLE，空闲时不会产生额外中断，功耗代价可忽略。
+# 与 Ubuntu 26.04 Resolute arm64 generic 保持一致：1000Hz + NO_HZ_FULL。
+# 未设置 nohz_full= 启动参数时不会隔离 CPU，仅保留 Ubuntu 的编译能力。
 CONFIG_HZ_300=n
 CONFIG_HZ_1000=y
 CONFIG_HZ=1000
+CONFIG_NO_HZ_IDLE=n
+CONFIG_NO_HZ_FULL=y
 
-# 完全抢占 + 运行时可切换。
+# Ubuntu generic 默认使用 lazy preemption，并允许运行时切换。
 # 内核参数 preempt=full|lazy|voluntary|none 可在不重新编译的情况下调整，
 # 编译期开销约等于零（arm64 使用 static key 实现）。
-CONFIG_PREEMPT=y
+CONFIG_PREEMPT=n
+CONFIG_PREEMPT_LAZY=y
 CONFIG_PREEMPT_DYNAMIC=y
+
+# Ubuntu generic 的任务分组、容器配额和利用率钳制配置。
+CONFIG_FAIR_GROUP_SCHED=y
+CONFIG_CFS_BANDWIDTH=y
+CONFIG_SCHED_AUTOGROUP=y
+CONFIG_UCLAMP_TASK=y
+CONFIG_UCLAMP_TASK_GROUP=y
 
 # big.LITTLE 调度域：RK3588 为 A76x2 + A76x2 + A55x4 三簇结构
 CONFIG_SCHED_MC=y
@@ -184,36 +194,11 @@ CONFIG_ARM64_VA_BITS_48=y
 # -------------------------------------------------------------
 # [3.5] CPUFreq governor
 # -------------------------------------------------------------
-## build-kernel.sh 会把下面其中一行的 =n 替换成 =y，并以该名字命名内核。
-## 参数由 build_kernel_env.sh 传入，目前构建 conservative + ondemand 两个版本。
-##
-## ===== 本机实测数据 (2026-07-31, A76 cpu6, 20ms 计算 + 60ms 空闲的突发负载) =====
-##   governor      突发耗时(中位)   平均频率    满频占比   持续满载吞吐
-##   performance      20.0 ms       2400 MHz     100%       ~2700 Mops/s
-##   ondemand         25.0 ms       1720 MHz      32%       ~2700 Mops/s
-##   schedutil        37.9 ms       1210 MHz       0%       ~2700 Mops/s
-##
-##   结论 1: 持续满载时三者完全等价（都锁满频），差别只体现在突发/交互负载。
-##   结论 2: schedutil 在本内核上明显最慢。原因是它按 PELT 平均利用率定频，
-##           25% 占空比的任务就只给 ~1.2GHz，全程摸不到满频；而唯一能纠正
-##           这一点的 uclamp 提频机制需要 CONFIG_UCLAMP_TASK（当前未开启，
-##           且 Ubuntu 桌面侧也没有组件会去设置 uclamp.min）。
-##           EAS 确实能激活（sched_energy_aware=1），但它只影响任务在哪个簇
-##           上跑，不影响调频激进程度，救不了这 89% 的差距。
-##   结论 3: 追求性能就用 `performance`，其次 `ondemand`。不要用 schedutil，
-##           除非先开 CONFIG_UCLAMP_TASK 并在用户态自行配置 uclamp。
-##           实测满载 8 线程温度也只到 48°C（PWM 风扇在工作），
-##           `performance` 对本机是可行选项。
-##
-## - **最高性能/低延迟** : `performance`（突发负载比 ondemand 再快 25%）
-## - **性能与功耗平衡**  : `ondemand`（当前默认）
-## - **省电/防过热**     : `conservative`
-## - **不推荐**          : `schedutil`（理由见上）
-##
-## 想改构建组合，编辑 build_kernel_env.sh 里那两行 ./build-kernel.sh 的参数即可。
+## Ubuntu 26.04 Resolute 官方 arm64 generic 默认使用 ondemand，而非 schedutil。
+## build-kernel.sh 仍允许通过 KERNEL_GOVS 构建其他 governor 测试版本。
 CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=n
 CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=n
-CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=n
+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
 CONFIG_CPU_FREQ_DEFAULT_GOV_CONSERVATIVE=n
 
 # 四种调速器全部编译进来，运行时可用 cpupower/sysfs 随时切换

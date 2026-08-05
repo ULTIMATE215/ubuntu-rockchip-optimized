@@ -54,7 +54,13 @@
 
 ## 🔨 构建
 
-### GitHub Actions（仅构建内核）
+### GitHub Actions
+
+`full-image-build` 会构建完整的 Orange Pi 5 Plus Desktop/Server 镜像并上传
+`.img.xz` artifact。默认使用 Ubuntu 26.04 Resolute arm64 的调度基线：
+`PREEMPT_LAZY + PREEMPT_DYNAMIC`、1000Hz、UCLAMP 和 `ondemand`。
+
+`kernel-only-build` 仅构建内核：
 
 在 Actions 页面手动触发 `kernel-only-build`，勾选需要的内核模式即可，
 可多选，产出的 `.deb` 会作为 artifact 上传。
@@ -71,7 +77,7 @@
 ```bash
 sudo ./main-control.sh <mesa变体>
 
-# 指定内核模式（默认 conservative,ondemand）
+# 指定内核模式（默认 ondemand，与 Ubuntu arm64 一致）
 KERNEL_GOVS=ondemand,performance sudo ./main-control.sh <mesa变体>
 
 # 构建 server 版 rootfs（默认 desktop）
@@ -108,8 +114,8 @@ U-Boot、内核、Mesa、rootfs 分别在独立的 systemd-nspawn 洁净环境�
 - **持续满载时三者完全等价**——都锁在最高频，差异全在突发/交互负载上。
 - **schedutil 慢 89% 且全程摸不到满频**。它按 PELT 平均利用率定频，25% 占空比的任务只分到 ~1.2GHz。
   能量模型确实注册成功、EAS 也确实激活（`sched_energy_aware=1`），但 EAS 只影响任务在哪个簇上运行，
-  不影响调频激进程度。唯一能纠正的 uclamp 提频机制需要 `CONFIG_UCLAMP_TASK`，且通用 Ubuntu 桌面
-  没有任何组件会去设置 `uclamp.min`——这正是 Android 能用好 schedutil 而桌面发行版不能的原因。
+  不影响调频激进程度。当前配置已按 Ubuntu generic 启用 `CONFIG_UCLAMP_TASK`，但 Ubuntu arm64 默认
+  仍是 `ondemand`；上表保留用于对比手动切换到 `schedutil` 时的行为。
 
 ### glmark2-es2-wayland 得分
 

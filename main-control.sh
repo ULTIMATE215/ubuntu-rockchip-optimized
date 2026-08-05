@@ -14,7 +14,8 @@ build_type="${BUILD_TYPE:-desktop}"
 # 要构建的内核模式（CPUFreq governor），逗号分隔。
 # 可选: ondemand / conservative / performance / schedutil
 # Set via environment: KERNEL_GOVS=ondemand,performance sudo ./main-control.sh ...
-kernel_govs="${KERNEL_GOVS:-conservative,ondemand}"
+# Ubuntu Resolute arm64 默认使用 ondemand；仍可通过环境变量构建其他版本。
+kernel_govs="${KERNEL_GOVS:-ondemand}"
 
 start_time=$(date)
 
