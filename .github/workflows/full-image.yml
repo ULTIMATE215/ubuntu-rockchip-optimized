@@ -1,0 +1,121 @@
+name: full-image-build
+run-name: Ubuntu 26.04 Desktop · Linux 7.1.6 · Ubuntu scheduler · ASPM/EEE workaround
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: Root filesystem type
+        type: choice
+        options:
+          - desktop
+          - server
+        default: desktop
+      mesa_variant:
+        description: Mesa source
+        type: choice
+        options:
+          - ubuntu
+          - upstream
+        default: ubuntu
+  push:
+    branches:
+      - ci-build-rkvenc
+    paths:
+      - .github/workflows/full-image.yml
+      - build-kernel.sh
+      - build_kernel_env.sh
+      - main-control.sh
+      - my-add.txt
+      - rootfs-bootstrap.sh
+      - kernel-patches/**
+      - overlay/**
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  BUILD_TYPE: ${{ inputs.build_type || 'desktop' }}
+  MESA_VARIANT: ${{ inputs.mesa_variant || 'ubuntu' }}
+  KERNEL_GOVS: ondemand
+  KERNEL_REF: v7.1.6
+
+jobs:
+  build:
+    name: Build Orange Pi 5 Plus image
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install host dependencies
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            qemu-user-static binfmt-support systemd-container debootstrap \
+            build-essential bc bison flex fakeroot rsync git \
+            parted fdisk uuid-runtime xz-utils
+          sudo systemctl restart systemd-binfmt || true
+          df -h
+
+      - name: Prepare build tree
+        run: |
+          set -euxo pipefail
+          chmod +x ./*.sh
+          cp my-add.txt overlay/my-add.txt
+
+      - name: Build complete image
+        run: |
+          set -euxo pipefail
+          sudo -E env \
+            BUILD_TYPE="$BUILD_TYPE" \
+            KERNEL_GOVS="$KERNEL_GOVS" \
+            KERNEL_REF="$KERNEL_REF" \
+            ./main-control.sh "$MESA_VARIANT"
+
+      - name: Fix images ownership
+        run: |
+          set -euxo pipefail
+          sudo chown -R $(id -u):$(id -g) images
+
+      - name: Verify configuration and image
+        run: |
+          set -euxo pipefail
+          grep -Fx 'KERNEL_REF=v7.1.6' overlay/kernel-source.txt
+          for symbol in \
+            CONFIG_PREEMPT_LAZY \
+            CONFIG_PREEMPT_DYNAMIC \
+            CONFIG_UCLAMP_TASK \
+            CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND; do
+            grep -Fx "${symbol}=y" overlay/2-config.txt
+          done
+          tar -tzf overlay/ubuntu.rootfs.tar.gz > "$RUNNER_TEMP/rootfs-files.txt"
+          cmdline_path="$(awk '/(^|^\.\/)etc\/kernel\/cmdline$/{print; exit}' "$RUNNER_TEMP/rootfs.txt")"
+          service_path="$(awk '/(^|^\.\/)etc\/systemd\/system\/r8169-disable-eee.service$/{print; exit}' "$RUNNER_TEMP/rootfs.txt")"
+          test -n "$cmdline_path"
+          test -n "$service_path"
+          tar -xOzf overlay/ubuntu.rootfs.tar.gz "$cmdline_path" | grep -F 'pcie_aspm=off'
+          tar -xOzf overlay/ubuntu.rootfs.tar.gz "$service_path" | grep -F 'ExecStart=/usr/local/sbin/disable-r8169-eee'
+          ls -lh images/*.img.xz
+          sha256sum images/*.img.xz > images/SHA256SUMS
+
+      - name: Build diagnostics
+        if: always()
+        run: |
+          df -h
+          ls -lah images overlay kernel 2>/dev/null || true
+
+      - name: Upload system image
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-resolute-orangepi-5-plus-linux-7.1.6-aspm-off
+          path: |
+            images/*.img.xz
+            images/SHA256SUMS
+            overlay/kernel-source.txt
+            overlay/2-config.txt
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
