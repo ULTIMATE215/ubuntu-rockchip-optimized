@@ -74,6 +74,11 @@ jobs:
             KERNEL_REF="$KERNEL_REF" \
             ./main-control.sh "$MESA_VARIANT"
 
+      - name: Fix image ownership
+        run: |
+          set -euxo pipefail
+          sudo chown -R "$(id -u):$(id -g)" images
+
       - name: Verify configuration and image
         run: |
           set -euxo pipefail
